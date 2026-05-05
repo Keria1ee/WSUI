@@ -15,6 +15,7 @@ export default function App() {
   const [password, setPassword] = useState(() => sessionStorage.getItem(PASSWORD_KEY) || '');
   const [snapshot, setSnapshot] = useState(null);
   const [history, setHistory] = useState(null);
+  const [performanceView, setPerformanceView] = useState('marketPrice');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -126,7 +127,7 @@ export default function App() {
       <section className="hero-band" id="overview">
         <div className="page-shell hero-layout">
           <div className="hero-copy">
-            <p className="eyebrow">Internal Simulation · {snapshot.fund.type}</p>
+            <p className="eyebrow">Internal Simulation / {snapshot.fund.type}</p>
             <h1>{snapshot.fund.ticker}</h1>
             <h2>{snapshot.fund.name}</h2>
             <p className="hero-text">
@@ -169,18 +170,12 @@ export default function App() {
         </div>
       </section>
 
-      <section className="band" id="performance">
-        <div className="page-shell two-column">
-          <div>
-            <p className="eyebrow">Performance</p>
-            <h2>WSUI vs QQQ</h2>
-            <p className="section-copy">
-              WSUI begins at NAV 100.00 and tracks the launch basket after target-weight construction.
-            </p>
-          </div>
-          <LineChart points={history?.points || []} />
-        </div>
-      </section>
+      <PerformanceSection
+        snapshot={snapshot}
+        history={history}
+        view={performanceView}
+        onViewChange={setPerformanceView}
+      />
 
       <section className="band white-band" id="themes">
         <div className="page-shell">
@@ -224,14 +219,14 @@ export default function App() {
             <MethodItem label="Launch" value={`Initial NAV ${formatNav(snapshot.fund.initialNav)} on ${formatDate(snapshot.fund.inceptionDate)}`} />
             <MethodItem label="Weighting" value={snapshot.fund.methodology.weighting} />
             <MethodItem label="Rebalance" value={snapshot.fund.methodology.rebalanceFrequency} />
-            <MethodItem label="Benchmark" value={`${snapshot.benchmark.symbol} · ${snapshot.benchmark.name}`} />
+            <MethodItem label="Benchmark" value={`${snapshot.benchmark.symbol} / ${snapshot.benchmark.name}`} />
           </div>
         </div>
       </section>
 
       <footer className="footer" id="disclaimer">
         <div className="page-shell">
-          <strong>{snapshot.fund.ticker} · {snapshot.fund.name}</strong>
+          <strong>{snapshot.fund.ticker} / {snapshot.fund.name}</strong>
           <p>{snapshot.fund.disclaimer}</p>
         </div>
       </footer>
@@ -321,38 +316,157 @@ function StackBar({ holdings }) {
   );
 }
 
-function LineChart({ points }) {
-  const cleanPoints = points.filter((point) => Number.isFinite(point.wsui) && Number.isFinite(point.benchmark));
-  const values = cleanPoints.flatMap((point) => [point.wsui, point.benchmark]);
-  const min = Math.min(...values, 96);
-  const max = Math.max(...values, 104);
-  const width = 720;
-  const height = 260;
-  const padding = 28;
-  const xStep = cleanPoints.length > 1 ? (width - padding * 2) / (cleanPoints.length - 1) : 0;
-  const yFor = (value) => {
-    const ratio = max === min ? 0.5 : (value - min) / (max - min);
-    return height - padding - ratio * (height - padding * 2);
-  };
-  const lineFor = (key) => cleanPoints
-    .map((point, index) => `${padding + index * xStep},${yFor(point[key])}`)
-    .join(' ');
+function PerformanceSection({ snapshot, history, view, onViewChange }) {
+  const metric = snapshot.performance[view];
+  const isMarketPrice = view === 'marketPrice';
 
   return (
-    <div className="chart-wrap">
-      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="WSUI and benchmark performance chart">
-        <line x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} className="axis" />
-        <line x1={padding} y1={padding} x2={padding} y2={height - padding} className="axis" />
-        <polyline points={lineFor('benchmark')} className="chart-line benchmark-line" />
-        <polyline points={lineFor('wsui')} className="chart-line wsui-line" />
-        {cleanPoints.map((point, index) => (
-          <circle key={`${point.date}-${index}`} cx={padding + index * xStep} cy={yFor(point.wsui)} r="4" className="wsui-dot" />
+    <section className="band white-band" id="performance">
+      <div className="page-shell performance-shell">
+        <div className="performance-heading">
+          <div>
+            <p className="eyebrow">Performance</p>
+            <h2>Performance</h2>
+          </div>
+          <span>As of {formatDate(snapshot.performance.asOf)}</span>
+        </div>
+
+        <div className="performance-tabs" role="tablist" aria-label="Performance view">
+          <button
+            className={isMarketPrice ? 'active' : ''}
+            type="button"
+            onClick={() => onViewChange('marketPrice')}
+          >
+            Market Price
+          </button>
+          <button
+            className={!isMarketPrice ? 'active' : ''}
+            type="button"
+            onClick={() => onViewChange('nav')}
+          >
+            NAV
+          </button>
+        </div>
+
+        <PerformanceChart points={history?.points || []} metric={metric} valueKey={view} />
+
+        <div className="performance-table">
+          <PerformanceRow label={isMarketPrice ? 'Closing Price' : 'NAV'} value={formatCurrency(metric.current)} strong />
+          <PerformanceRow label="Change ($)" value={formatCurrency(metric.change)} strong />
+          <PerformanceRow label="Change (%)" value={formatPercent(metric.changePercent)} strong />
+          {isMarketPrice ? (
+            <PerformanceRow
+              label="30-Day Median Bid/Ask Spread"
+              value={formatAbsolutePercent(metric.medianBidAskSpreadPercent)}
+              strong
+            />
+          ) : (
+            <PerformanceRow
+              label="Premium / Discount"
+              value={formatAbsolutePercent(((snapshot.marketPrice - snapshot.nav) / snapshot.nav) * 100)}
+              strong
+            />
+          )}
+          <PerformanceSubhead label="Annualized Performance" />
+          <PerformanceRow label={`1 Year (as of ${formatShortDate(snapshot.performance.asOf)})`} value="N/A" />
+          <PerformanceRow label={`3 Year (as of ${formatShortDate(snapshot.performance.asOf)})`} value="N/A" />
+          <PerformanceRow label={`5 Year (as of ${formatShortDate(snapshot.performance.asOf)})`} value="N/A" />
+          <PerformanceRow label={`Since Inception (as of ${formatShortDate(snapshot.performance.asOf)})`} value={formatPercent(metric.totalReturnPercent)} strong />
+        </div>
+
+        <p className="performance-note">
+          Performance data represents a private simulated index and is shown for education and discussion only.
+          Market Price is a configurable simulated price and defaults to NAV when no premium or discount is set.
+          Past performance does not guarantee future results.
+        </p>
+      </div>
+    </section>
+  );
+}
+
+function PerformanceChart({ points, metric, valueKey }) {
+  const cleanPoints = points
+    .filter((point) => Number.isFinite(Number(point[valueKey])))
+    .map((point) => ({
+      date: point.date,
+      value: Number(point[valueKey])
+    }));
+  const chartPoints = cleanPoints.length >= 2
+    ? cleanPoints
+    : [
+        { date: 'Start', value: metric.initial },
+        { date: 'Now', value: metric.current }
+      ];
+  const values = chartPoints.map((point) => point.value);
+  const rawMin = Math.min(...values);
+  const rawMax = Math.max(...values);
+  const paddingValue = Math.max((rawMax - rawMin) * 0.18, rawMax * 0.02, 1);
+  const min = Math.max(0, rawMin - paddingValue);
+  const max = rawMax + paddingValue;
+  const width = 960;
+  const height = 360;
+  const left = 66;
+  const right = 18;
+  const top = 18;
+  const bottom = 58;
+  const innerWidth = width - left - right;
+  const innerHeight = height - top - bottom;
+  const xStep = chartPoints.length > 1 ? innerWidth / (chartPoints.length - 1) : 0;
+  const yFor = (value) => {
+    const ratio = max === min ? 0.5 : (value - min) / (max - min);
+    return top + (1 - ratio) * innerHeight;
+  };
+  const xFor = (index) => left + index * xStep;
+  const linePoints = chartPoints.map((point, index) => `${xFor(index)},${yFor(point.value)}`).join(' ');
+  const areaPoints = `${left},${height - bottom} ${linePoints} ${xFor(chartPoints.length - 1)},${height - bottom}`;
+  const ticks = [0, 0.25, 0.5, 0.75, 1].map((tick) => min + (max - min) * tick);
+  const labelInterval = Math.max(1, Math.ceil(chartPoints.length / 6));
+  const labelIndexes = chartPoints
+    .map((_point, index) => index)
+    .filter((index) => index === 0 || index === chartPoints.length - 1 || index % labelInterval === 0);
+
+  return (
+    <div className="performance-chart">
+      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${metric.label} performance chart`}>
+        <defs>
+          <linearGradient id="performance-area-fill" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor="#aeb6c4" stopOpacity="0.56" />
+            <stop offset="100%" stopColor="#aeb6c4" stopOpacity="0.02" />
+          </linearGradient>
+        </defs>
+        {ticks.map((tick) => (
+          <g key={tick}>
+            <line x1={left} y1={yFor(tick)} x2={width - right} y2={yFor(tick)} className="performance-grid-line" />
+            <text x={left - 12} y={yFor(tick) + 4} textAnchor="end" className="performance-axis-label">
+              {formatChartCurrency(tick)}
+            </text>
+          </g>
+        ))}
+        <polygon points={areaPoints} className="performance-area" />
+        <polyline points={linePoints} className="performance-line" />
+        {labelIndexes.map((index) => (
+          <text key={`${chartPoints[index].date}-${index}`} x={xFor(index)} y={height - 22} textAnchor="middle" className="performance-date-label">
+            {formatChartDate(chartPoints[index].date)}
+          </text>
         ))}
       </svg>
-      <div className="chart-legend">
-        <span><i className="wsui-key" /> WSUI</span>
-        <span><i className="benchmark-key" /> QQQ</span>
-      </div>
+    </div>
+  );
+}
+
+function PerformanceRow({ label, value, strong }) {
+  return (
+    <div className="performance-row">
+      <span>{label}</span>
+      <strong className={strong ? '' : 'muted-value'}>{value}</strong>
+    </div>
+  );
+}
+
+function PerformanceSubhead({ label }) {
+  return (
+    <div className="performance-subhead">
+      <strong>{label}</strong>
     </div>
   );
 }
@@ -413,8 +527,16 @@ function formatCurrency(value) {
   }).format(value);
 }
 
+function formatChartCurrency(value) {
+  return `$${Number(value).toFixed(0)}`;
+}
+
 function formatPercent(value) {
   return `${Number(value) >= 0 ? '+' : ''}${Number(value).toFixed(2)}%`;
+}
+
+function formatAbsolutePercent(value) {
+  return `${Number(value).toFixed(2)}%`;
 }
 
 function formatSigned(value) {
@@ -440,4 +562,23 @@ function formatDateTime(value) {
     hour: '2-digit',
     minute: '2-digit'
   }).format(new Date(value));
+}
+
+function formatShortDate(value) {
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'numeric',
+    day: 'numeric',
+    year: '2-digit'
+  }).format(new Date(`${value}T00:00:00`));
+}
+
+function formatChartDate(value) {
+  if (value === 'Start' || value === 'Now') {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    year: 'numeric'
+  }).format(new Date(`${value}T00:00:00`));
 }

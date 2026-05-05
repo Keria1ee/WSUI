@@ -5,6 +5,11 @@
   "theme": "AI Infrastructure",
   "inceptionDate": "2026-05-05",
   "initialNav": 100,
+  "marketPrice": {
+    "initialPrice": 100,
+    "premiumDiscountBps": 0,
+    "medianBidAskSpreadPercent": 0
+  },
   "benchmark": {
     "symbol": "QQQ",
     "name": "Invesco QQQ Trust",

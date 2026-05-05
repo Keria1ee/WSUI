@@ -233,6 +233,7 @@ function makeDemoQuote(symbol) {
 
 function calculateSnapshot(fund, quotesBySymbol) {
   const initialNav = Number(fund.initialNav || 100);
+  const marketPriceConfig = getMarketPriceConfig(fund, initialNav);
   const configuredBaselines = fund.holdings.every((holding) => isPositiveNumber(holding.inceptionPrice));
   const benchmarkQuote = quotesBySymbol[fund.benchmark.symbol];
   const benchmarkBase = basePrice(fund.benchmark, benchmarkQuote);
@@ -267,6 +268,8 @@ function calculateSnapshot(fund, quotesBySymbol) {
 
   const nav = holdings.reduce((sum, holding) => sum + holding.marketValue, 0);
   const previousNav = holdings.reduce((sum, holding) => sum + holding.previousValue, 0);
+  const marketPrice = marketPriceForNav(nav, initialNav, marketPriceConfig);
+  const previousMarketPrice = marketPriceForNav(previousNav, initialNav, marketPriceConfig);
   const currentHoldings = holdings
     .map((holding) => ({
       ...holding,
@@ -298,6 +301,30 @@ function calculateSnapshot(fund, quotesBySymbol) {
     dayChange: nav - previousNav,
     dayChangePercent: percentage(nav - previousNav, previousNav),
     totalReturnPercent: percentage(nav - initialNav, initialNav),
+    marketPrice,
+    previousMarketPrice,
+    performance: {
+      asOf: new Date().toISOString().slice(0, 10),
+      marketPrice: {
+        label: 'Market Price',
+        initial: marketPriceConfig.initialPrice,
+        current: marketPrice,
+        previous: previousMarketPrice,
+        change: marketPrice - previousMarketPrice,
+        changePercent: percentage(marketPrice - previousMarketPrice, previousMarketPrice),
+        totalReturnPercent: percentage(marketPrice - marketPriceConfig.initialPrice, marketPriceConfig.initialPrice),
+        medianBidAskSpreadPercent: marketPriceConfig.medianBidAskSpreadPercent
+      },
+      nav: {
+        label: 'NAV',
+        initial: initialNav,
+        current: nav,
+        previous: previousNav,
+        change: nav - previousNav,
+        changePercent: percentage(nav - previousNav, previousNav),
+        totalReturnPercent: percentage(nav - initialNav, initialNav)
+      }
+    },
     holdings: currentHoldings,
     benchmark: {
       symbol: fund.benchmark.symbol,
@@ -375,16 +402,20 @@ async function fetchFinnhubHistory(fund, snapshot) {
     : benchmarkFirstClose;
 
   const points = dates.map((date) => {
+    const initialNav = Number(fund.initialNav || 100);
+    const marketPriceConfig = getMarketPriceConfig(fund, initialNav);
     const wsui = fund.holdings.reduce((sum, holding) => {
       const close = closeForDate(candlesBySymbol[holding.symbol], date);
-      return sum + Number(fund.initialNav || 100) * holding.targetWeight * (close / holdingBases[holding.symbol]);
+      return sum + initialNav * holding.targetWeight * (close / holdingBases[holding.symbol]);
     }, 0);
     const benchmarkClose = closeForDate(candlesBySymbol[fund.benchmark.symbol], date);
 
     return {
       date,
       wsui,
-      benchmark: Number(fund.initialNav || 100) * (benchmarkClose / benchmarkBase)
+      nav: wsui,
+      marketPrice: marketPriceForNav(wsui, initialNav, marketPriceConfig),
+      benchmark: initialNav * (benchmarkClose / benchmarkBase)
     };
   });
 
@@ -422,16 +453,41 @@ function buildLaunchHistory(snapshot, mode) {
     {
       date: snapshot.fund.inceptionDate,
       wsui: snapshot.fund.initialNav,
+      nav: snapshot.fund.initialNav,
+      marketPrice: snapshot.performance.marketPrice.initial,
       benchmark: snapshot.fund.initialNav
     },
     {
       date: new Date().toISOString().slice(0, 10),
       wsui: snapshot.nav,
+      nav: snapshot.nav,
+      marketPrice: snapshot.performance.marketPrice.current,
       benchmark: snapshot.benchmark.nav
     }
   ];
 
   return { mode, points };
+}
+
+function getMarketPriceConfig(fund, initialNav) {
+  const config = fund.marketPrice || {};
+  const premiumDiscountBps = Number(config.premiumDiscountBps || 0);
+
+  return {
+    initialPrice: isPositiveNumber(config.initialPrice) ? Number(config.initialPrice) : initialNav,
+    premiumDiscountFactor: 1 + premiumDiscountBps / 10000,
+    medianBidAskSpreadPercent: Number.isFinite(Number(config.medianBidAskSpreadPercent))
+      ? Number(config.medianBidAskSpreadPercent)
+      : 0
+  };
+}
+
+function marketPriceForNav(nav, initialNav, marketPriceConfig) {
+  if (!isPositiveNumber(initialNav)) {
+    return Number(nav || 0);
+  }
+
+  return marketPriceConfig.initialPrice * (Number(nav) / initialNav) * marketPriceConfig.premiumDiscountFactor;
 }
 
 function commonDates(candlesBySymbol, symbols) {
