@@ -2,12 +2,12 @@ import { useEffect, useMemo, useState } from 'react';
 
 const PASSWORD_KEY = 'wsui-password';
 
-const themeColors = {
-  'AI Compute': '#1f5eff',
-  Storage: '#00a676',
-  Memory: '#7c3aed',
-  'Cloud Infrastructure': '#f59e0b',
-  'Semiconductor Manufacturing': '#d64545'
+const themeLabels = {
+  'AI Compute': 'Compute',
+  Storage: 'Storage',
+  Memory: 'Memory',
+  'Cloud Infrastructure': 'Cloud',
+  'Semiconductor Manufacturing': 'Semis'
 };
 
 export default function App() {
@@ -110,7 +110,7 @@ export default function App() {
 
   return (
     <main>
-      <Header snapshot={snapshot} />
+      <Header />
 
       {snapshot.source.mode !== 'market' && (
         <div className="system-banner">
@@ -120,198 +120,202 @@ export default function App() {
 
       {snapshot.source.baselineStatus !== 'configured' && (
         <div className="system-banner muted-banner">
-          Launch prices are currently derived from previous close values. Freeze inception prices in <code>data/fund.json</code> after the official start snapshot.
+          Launch prices are derived from previous close values until inception prices are frozen in <code>data/fund.json</code>.
         </div>
       )}
 
-      <section className="hero-band" id="overview">
-        <div className="page-shell hero-layout">
-          <div className="hero-copy">
-            <p className="eyebrow">Internal Simulation / {snapshot.fund.type}</p>
-            <h1>{snapshot.fund.ticker}</h1>
-            <h2>{snapshot.fund.name}</h2>
-            <p className="hero-text">
-              A simulated U.S. equity index tracking AI infrastructure across compute, storage, memory,
-              cloud, and semiconductor manufacturing.
-            </p>
-            <div className="hero-actions">
-              <a href="#holdings">Holdings</a>
-              <a href="#methodology">Methodology</a>
-              <a href="#disclaimer">Disclaimer</a>
-            </div>
-          </div>
-
-          <div className="market-panel">
-            <div className="market-topline">
-              <span>NAV</span>
-              <strong>{formatNav(snapshot.nav)}</strong>
-            </div>
-            <div className={snapshot.dayChangePercent >= 0 ? 'change positive' : 'change negative'}>
-              {formatSigned(snapshot.dayChange)} / {formatPercent(snapshot.dayChangePercent)}
-            </div>
-            <div className="metric-grid">
-              <Metric label="Since Inception" value={formatPercent(snapshot.totalReturnPercent)} tone={snapshot.totalReturnPercent >= 0 ? 'positive' : 'negative'} />
-              <Metric label="Benchmark QQQ" value={formatPercent(snapshot.benchmark.totalReturnPercent)} tone={snapshot.benchmark.totalReturnPercent >= 0 ? 'positive' : 'negative'} />
-              <Metric label="Inception" value={formatDate(snapshot.fund.inceptionDate)} />
-              <Metric label="Holdings" value={String(snapshot.holdings.length)} />
-            </div>
-            <p className="timestamp">Updated {formatDateTime(snapshot.updatedAt)}</p>
-          </div>
-        </div>
-      </section>
-
-      <section className="band white-band">
-        <div className="page-shell stack-layout">
-          <div>
-            <p className="eyebrow">Target Allocation</p>
-            <h2>AI Infrastructure Stack</h2>
-          </div>
-          <StackBar holdings={sortedByTarget} />
-        </div>
-      </section>
-
+      <Hero snapshot={snapshot} holdings={sortedByTarget} />
+      <AnchorNav />
+      <OverviewSection snapshot={snapshot} />
+      <HoldingsSection snapshot={snapshot} holdings={sortedByTarget} />
       <PerformanceSection
         snapshot={snapshot}
         history={history}
         view={performanceView}
         onViewChange={setPerformanceView}
       />
-
-      <section className="band white-band" id="themes">
-        <div className="page-shell">
-          <div className="section-heading">
-            <p className="eyebrow">Themes</p>
-            <h2>What WSUI Owns</h2>
-          </div>
-          <div className="theme-grid">
-            {sortedByTarget.map((holding) => (
-              <article className="theme-tile" key={holding.symbol}>
-                <span style={{ background: themeColors[holding.theme] || '#2f3948' }} />
-                <h3>{holding.symbol}</h3>
-                <p>{holding.theme}</p>
-                <strong>{formatWeight(holding.targetWeight)}</strong>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="band" id="holdings">
-        <div className="page-shell">
-          <div className="section-heading split-heading">
-            <div>
-              <p className="eyebrow">Holdings</p>
-              <h2>Current Portfolio</h2>
-            </div>
-            <span className="pill">{snapshot.source.provider}</span>
-          </div>
-          <HoldingsTable holdings={snapshot.holdings} />
-        </div>
-      </section>
-
-      <section className="band white-band" id="methodology">
-        <div className="page-shell methodology-grid">
-          <div>
-            <p className="eyebrow">Methodology</p>
-            <h2>Target Weight, Then Drift</h2>
-          </div>
-          <div className="method-list">
-            <MethodItem label="Launch" value={`Initial NAV ${formatNav(snapshot.fund.initialNav)} on ${formatDate(snapshot.fund.inceptionDate)}`} />
-            <MethodItem label="Weighting" value={snapshot.fund.methodology.weighting} />
-            <MethodItem label="Rebalance" value={snapshot.fund.methodology.rebalanceFrequency} />
-            <MethodItem label="Benchmark" value={`${snapshot.benchmark.symbol} / ${snapshot.benchmark.name}`} />
-          </div>
-        </div>
-      </section>
-
-      <footer className="footer" id="disclaimer">
-        <div className="page-shell">
-          <strong>{snapshot.fund.ticker} / {snapshot.fund.name}</strong>
-          <p>{snapshot.fund.disclaimer}</p>
-        </div>
-      </footer>
+      <DocumentsSection />
+      <PremiumDiscountSection snapshot={snapshot} />
+      <FaqSection snapshot={snapshot} />
+      <Footer snapshot={snapshot} />
     </main>
   );
 }
 
-function Header({ snapshot }) {
+function Header() {
   return (
-    <header className="topbar">
-      <a className="brand" href="#overview">
-        <span>{snapshot.fund.ticker}</span>
-        <strong>{snapshot.fund.name}</strong>
-      </a>
-      <nav>
-        <a href="#performance">Performance</a>
-        <a href="#themes">Themes</a>
-        <a href="#holdings">Holdings</a>
-        <a href="#methodology">Methodology</a>
-      </nav>
+    <header className="site-header">
+      <div className="page-shell header-inner">
+        <a className="wordmark" href="#top" aria-label="WSUI home">
+          <span>WSUI</span>
+        </a>
+        <nav className="primary-nav">
+          <a href="#overview">Our Index</a>
+          <a href="#holdings">Holdings</a>
+          <a href="#performance">Performance</a>
+          <a href="#faq">FAQ</a>
+        </nav>
+      </div>
     </header>
   );
 }
 
-function PasswordGate({ onSubmit, error }) {
-  const [value, setValue] = useState('');
-
+function Hero({ snapshot, holdings }) {
   return (
-    <main className="password-screen">
-      <form
-        className="password-box"
-        onSubmit={(event) => {
-          event.preventDefault();
-          onSubmit(value);
-        }}
-      >
-        <p className="eyebrow">WSUI Private View</p>
-        <h1>West Side Unity Index</h1>
-        <input
-          autoFocus
-          type="password"
-          value={value}
-          onChange={(event) => setValue(event.target.value)}
-          placeholder="Group password"
-        />
-        <button type="submit">Enter</button>
-        {error && <p className="form-error">{error}</p>}
-      </form>
-    </main>
+    <section className="hero" id="top">
+      <div className="page-shell hero-grid">
+        <div className="hero-copy">
+          <p className="fund-type">Simulated U.S. Equity Index</p>
+          <h1>{snapshot.fund.ticker} {snapshot.fund.name}</h1>
+          <p className="hero-text">
+            A private group simulation tracking the AI infrastructure stack across compute,
+            memory, storage, cloud infrastructure, and semiconductor manufacturing.
+          </p>
+          <div className="hero-buttons">
+            <a className="button primary-button" href="#holdings">View Holdings</a>
+            <a className="button ghost-button" href="#documents">Fact Sheet</a>
+          </div>
+        </div>
+
+        <aside className="hero-holdings" aria-label="Top holdings">
+          <div className="hero-holdings-heading">
+            <h2>Top 5 Holdings</h2>
+            <span>as of {formatShortDate(snapshot.performance.asOf)}</span>
+          </div>
+          <div className="logo-row">
+            {holdings.map((holding) => (
+              <div className="logo-mark" key={holding.symbol}>
+                <strong>{holding.symbol}</strong>
+                <span>{themeLabels[holding.theme] || holding.theme}</span>
+              </div>
+            ))}
+          </div>
+        </aside>
+      </div>
+    </section>
   );
 }
 
-function Metric({ label, value, tone }) {
+function AnchorNav() {
   return (
-    <div className="metric">
+    <nav className="anchor-nav" aria-label="Page sections">
+      <div className="page-shell anchor-inner">
+        <a href="#overview">Overview</a>
+        <a href="#holdings">Top Holdings</a>
+        <a href="#performance">Performance</a>
+        <a href="#documents">Documents</a>
+        <a href="#premium-discount">Premium/Discount</a>
+        <a href="#faq">FAQ</a>
+      </div>
+    </nav>
+  );
+}
+
+function OverviewSection({ snapshot }) {
+  return (
+    <section className="section" id="overview">
+      <div className="page-shell overview-layout">
+        <div>
+          <h2>Overview</h2>
+          <p className="large-copy">
+            WSUI is built to simulate exposure to the picks and themes behind the West Side
+            AI infrastructure discussion, with a launch basket that drifts as real market prices move.
+          </p>
+          <div className="why-grid">
+            <Reason title="AI Infrastructure" text="Focused on the hardware and infrastructure layer behind the AI buildout." />
+            <Reason title="Targeted Basket" text="A concentrated group of U.S.-listed names rather than broad market exposure." />
+            <Reason title="Held, Not Reset Daily" text="Target weights set the launch basket; current weights drift with price movement." />
+          </div>
+        </div>
+
+        <div className="fund-details">
+          <h3>Fund Details</h3>
+          <DetailRow label="Ticker" value={snapshot.fund.ticker} />
+          <DetailRow label="Primary Exchange" value="Private Simulation" />
+          <DetailRow label="Expense Ratio" value="0.00%" />
+          <DetailRow label="Launch" value={formatDate(snapshot.fund.inceptionDate)} />
+          <DetailRow label="# of Holdings" value={String(snapshot.holdings.length)} />
+          <DetailRow label="Benchmark" value={snapshot.benchmark.symbol} />
+          <DetailRow label="Management Style" value="Group Simulated" />
+          <DetailRow label="Rebalance" value="Manual" />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Reason({ title, text }) {
+  return (
+    <article className="reason">
+      <h3>{title}</h3>
+      <p>{text}</p>
+    </article>
+  );
+}
+
+function DetailRow({ label, value }) {
+  return (
+    <div className="detail-row">
       <span>{label}</span>
-      <strong className={tone || ''}>{value}</strong>
+      <strong>{value}</strong>
     </div>
   );
 }
 
-function StackBar({ holdings }) {
+function HoldingsSection({ snapshot, holdings }) {
   return (
-    <div className="stack-visual">
-      <div className="stack-bar" aria-label="Target allocation">
-        {holdings.map((holding) => (
-          <span
-            key={holding.symbol}
-            style={{
-              width: `${holding.targetWeight * 100}%`,
-              background: themeColors[holding.theme] || '#2f3948'
-            }}
-            title={`${holding.symbol} ${formatWeight(holding.targetWeight)}`}
-          />
-        ))}
+    <section className="section" id="holdings">
+      <div className="page-shell">
+        <div className="section-heading">
+          <h2>Holdings</h2>
+          <p>As of {formatDate(snapshot.performance.asOf)}</p>
+        </div>
+
+        <div className="holdings-actions">
+          <button type="button">View All +</button>
+          <button type="button">Download CSV</button>
+          <button type="button">Download PDF</button>
+        </div>
+
+        <HoldingsTable holdings={holdings} />
+
+        <p className="table-note">
+          WSUI holdings and allocations are part of a private simulation and are subject to change at any time.
+        </p>
       </div>
-      <div className="stack-legend">
-        {holdings.map((holding) => (
-          <div key={holding.symbol}>
-            <span style={{ background: themeColors[holding.theme] || '#2f3948' }} />
-            <strong>{holding.symbol}</strong>
-            <em>{formatWeight(holding.targetWeight)}</em>
-          </div>
-        ))}
-      </div>
+    </section>
+  );
+}
+
+function HoldingsTable({ holdings }) {
+  return (
+    <div className="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Ticker</th>
+            <th>Theme</th>
+            <th>Target Weight</th>
+            <th>Current Weight</th>
+            <th>Price</th>
+            <th>Day Change</th>
+          </tr>
+        </thead>
+        <tbody>
+          {holdings.map((holding) => (
+            <tr key={holding.symbol}>
+              <td>{holding.name}</td>
+              <td><strong>{holding.symbol}</strong></td>
+              <td>{holding.theme}</td>
+              <td>{formatWeight(holding.targetWeight)}</td>
+              <td>{formatWeight(holding.currentWeight)}</td>
+              <td>{formatCurrency(holding.price)}</td>
+              <td className={holding.changePercent >= 0 ? 'positive' : 'negative'}>{formatPercent(holding.changePercent)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -321,13 +325,10 @@ function PerformanceSection({ snapshot, history, view, onViewChange }) {
   const isMarketPrice = view === 'marketPrice';
 
   return (
-    <section className="band white-band" id="performance">
+    <section className="section" id="performance">
       <div className="page-shell performance-shell">
         <div className="performance-heading">
-          <div>
-            <p className="eyebrow">Performance</p>
-            <h2>Performance</h2>
-          </div>
+          <h2>Performance</h2>
           <span>As of {formatDate(snapshot.performance.asOf)}</span>
         </div>
 
@@ -351,21 +352,13 @@ function PerformanceSection({ snapshot, history, view, onViewChange }) {
         <PerformanceChart points={history?.points || []} metric={metric} valueKey={view} />
 
         <div className="performance-table">
-          <PerformanceRow label={isMarketPrice ? 'Closing Price' : 'NAV'} value={formatCurrency(metric.current)} strong />
+          <PerformanceRow label={isMarketPrice ? 'Closing Price' : 'Net Asset Value'} value={formatCurrency(metric.current)} strong />
           <PerformanceRow label="Change ($)" value={formatCurrency(metric.change)} strong />
           <PerformanceRow label="Change (%)" value={formatPercent(metric.changePercent)} strong />
           {isMarketPrice ? (
-            <PerformanceRow
-              label="30-Day Median Bid/Ask Spread"
-              value={formatAbsolutePercent(metric.medianBidAskSpreadPercent)}
-              strong
-            />
+            <PerformanceRow label="30-Day Median Bid/Ask Spread" value={formatAbsolutePercent(metric.medianBidAskSpreadPercent)} strong />
           ) : (
-            <PerformanceRow
-              label="Premium / Discount"
-              value={formatAbsolutePercent(((snapshot.marketPrice - snapshot.nav) / snapshot.nav) * 100)}
-              strong
-            />
+            <PerformanceRow label="Premium/Discount" value={formatAbsolutePercent(((snapshot.marketPrice - snapshot.nav) / snapshot.nav) * 100)} strong />
           )}
           <PerformanceSubhead label="Annualized Performance" />
           <PerformanceRow label={`1 Year (as of ${formatShortDate(snapshot.performance.asOf)})`} value="N/A" />
@@ -375,9 +368,8 @@ function PerformanceSection({ snapshot, history, view, onViewChange }) {
         </div>
 
         <p className="performance-note">
-          Performance data represents a private simulated index and is shown for education and discussion only.
+          The performance data quoted represents a private simulation. Past performance does not guarantee future results.
           Market Price is a configurable simulated price and defaults to NAV when no premium or discount is set.
-          Past performance does not guarantee future results.
         </p>
       </div>
     </section>
@@ -471,52 +463,114 @@ function PerformanceSubhead({ label }) {
   );
 }
 
-function HoldingsTable({ holdings }) {
+function DocumentsSection() {
   return (
-    <div className="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Ticker</th>
-            <th>Name</th>
-            <th>Theme</th>
-            <th>Target</th>
-            <th>Current</th>
-            <th>Price</th>
-            <th>Day</th>
-            <th>Contribution</th>
-          </tr>
-        </thead>
-        <tbody>
-          {holdings.map((holding) => (
-            <tr key={holding.symbol}>
-              <td><strong>{holding.symbol}</strong></td>
-              <td>{holding.name}</td>
-              <td>{holding.theme}</td>
-              <td>{formatWeight(holding.targetWeight)}</td>
-              <td>{formatWeight(holding.currentWeight)}</td>
-              <td>{formatCurrency(holding.price)}</td>
-              <td className={holding.changePercent >= 0 ? 'positive' : 'negative'}>{formatPercent(holding.changePercent)}</td>
-              <td className={holding.dayContributionPercent >= 0 ? 'positive' : 'negative'}>{formatPercent(holding.dayContributionPercent)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <section className="section documents-section" id="documents">
+      <div className="page-shell">
+        <h2>Fund Documents</h2>
+        <div className="document-links">
+          <a href="#documents">Fact Sheet</a>
+          <a href="#documents">Methodology</a>
+          <a href="#documents">Simulation Notes</a>
+        </div>
+      </div>
+    </section>
   );
 }
 
-function MethodItem({ label, value }) {
+function PremiumDiscountSection({ snapshot }) {
+  const premiumDiscount = ((snapshot.marketPrice - snapshot.nav) / snapshot.nav) * 100;
+
   return (
-    <div className="method-item">
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
+    <section className="section" id="premium-discount">
+      <div className="page-shell premium-grid">
+        <h2>Premium/Discount</h2>
+        <div className="premium-table">
+          <DetailRow label="NAV" value={formatCurrency(snapshot.nav)} />
+          <DetailRow label="Market Price" value={formatCurrency(snapshot.marketPrice)} />
+          <DetailRow label="Premium/Discount" value={formatAbsolutePercent(premiumDiscount)} />
+          <DetailRow label="30-Day Median Bid/Ask Spread" value={formatAbsolutePercent(snapshot.performance.marketPrice.medianBidAskSpreadPercent)} />
+        </div>
+      </div>
+    </section>
   );
 }
 
-function formatNav(value) {
-  return Number(value).toFixed(2);
+function FaqSection({ snapshot }) {
+  return (
+    <section className="section" id="faq">
+      <div className="page-shell faq-layout">
+        <h2>FAQ</h2>
+        <FaqItem
+          question={`When did ${snapshot.fund.ticker} launch?`}
+          answer={`${snapshot.fund.ticker} began its private simulation on ${formatDate(snapshot.fund.inceptionDate)}.`}
+        />
+        <FaqItem
+          question="Can I trade WSUI?"
+          answer="No. WSUI is a private group simulation and is not a registered security, ETF, or investment product."
+        />
+        <FaqItem
+          question="How is the index calculated?"
+          answer="The launch basket is created from target weights, then simulated holdings drift with market prices until the group records a rebalance."
+        />
+      </div>
+    </section>
+  );
+}
+
+function FaqItem({ question, answer }) {
+  return (
+    <article className="faq-item">
+      <h3>{question}</h3>
+      <p>{answer}</p>
+    </article>
+  );
+}
+
+function Footer({ snapshot }) {
+  return (
+    <footer className="site-footer">
+      <div className="page-shell footer-grid">
+        <div>
+          <strong>{snapshot.fund.ticker} {snapshot.fund.name}</strong>
+          <p>{snapshot.fund.disclaimer}</p>
+        </div>
+        <div className="footer-links">
+          <a href="#overview">Overview</a>
+          <a href="#holdings">Holdings</a>
+          <a href="#performance">Performance</a>
+        </div>
+      </div>
+    </footer>
+  );
+}
+
+function PasswordGate({ onSubmit, error }) {
+  const [value, setValue] = useState('');
+
+  return (
+    <main className="password-screen">
+      <form
+        className="password-box"
+        onSubmit={(event) => {
+          event.preventDefault();
+          onSubmit(value);
+        }}
+      >
+        <p className="eyebrow">WSUI Private View</p>
+        <h1>West Side Unity Index</h1>
+        <input
+          autoFocus
+          type="password"
+          value={value}
+          onChange={(event) => setValue(event.target.value)}
+          placeholder="Group password"
+        />
+        <button type="submit">Enter</button>
+        {error && <p className="form-error">{error}</p>}
+      </form>
+    </main>
+  );
 }
 
 function formatCurrency(value) {
@@ -539,35 +593,22 @@ function formatAbsolutePercent(value) {
   return `${Number(value).toFixed(2)}%`;
 }
 
-function formatSigned(value) {
-  return `${Number(value) >= 0 ? '+' : ''}${Number(value).toFixed(2)}`;
-}
-
 function formatWeight(value) {
   return `${(Number(value) * 100).toFixed(1)}%`;
 }
 
 function formatDate(value) {
   return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
     year: 'numeric'
   }).format(new Date(`${value}T00:00:00`));
 }
 
-function formatDateTime(value) {
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  }).format(new Date(value));
-}
-
 function formatShortDate(value) {
   return new Intl.DateTimeFormat('en-US', {
-    month: 'numeric',
-    day: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
     year: '2-digit'
   }).format(new Date(`${value}T00:00:00`));
 }
