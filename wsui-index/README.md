@@ -10,6 +10,7 @@ npm run dev
 ```
 
 Frontend: `http://127.0.0.1:5173`  
+Alpha Engine: `http://127.0.0.1:5173/alpha`  
 API: `http://127.0.0.1:8787`
 
 ## Market Data
@@ -35,7 +36,7 @@ That writes real `inceptionPrice` values into `data/fund.json`, making WSUI beha
 
 ## Alpha Engine
 
-Members can submit two different tickers with optional cost basis values. The next WSUI consensus is calculated from:
+Members can submit two different tickers with optional cost basis values. If a cost basis is omitted, the server locks the market price at submission time as that pick's basis. The next WSUI consensus is calculated from:
 
 - 7-day market return
 - Return versus each member's cost basis

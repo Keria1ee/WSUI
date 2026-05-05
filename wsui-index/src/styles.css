@@ -71,6 +71,7 @@ input {
 }
 
 .primary-nav a:hover,
+.primary-nav a.active,
 .anchor-inner a:hover,
 .document-links a:hover {
   color: #233cff;
@@ -330,6 +331,263 @@ h2 {
   background: #fbfbfb;
 }
 
+.alpha-page {
+  background: #f4f6f8;
+}
+
+.alpha-hero-band {
+  padding: 74px 0 54px;
+  border-bottom: 1px solid #dfe4ea;
+  background: #111722;
+  color: #ffffff;
+}
+
+.alpha-hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 440px;
+  gap: 70px;
+  align-items: end;
+}
+
+.alpha-hero-copy .fund-type {
+  color: #9fb0c5;
+}
+
+.alpha-hero-copy h1 {
+  max-width: 720px;
+  margin: 0;
+  color: #ffffff;
+  font-size: 4.2rem;
+  font-weight: 880;
+  line-height: 0.96;
+  letter-spacing: 0;
+}
+
+.alpha-hero-copy p:not(.fund-type) {
+  max-width: 700px;
+  margin: 26px 0 0;
+  color: #dbe3ee;
+  font-size: 1.13rem;
+  line-height: 1.65;
+}
+
+.alpha-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 34px;
+}
+
+.alpha-hero-actions .primary-button {
+  border-color: #ffffff;
+  background: #ffffff;
+  color: #111722;
+}
+
+.alpha-hero-actions .ghost-button {
+  border-color: #6f7f94;
+  background: transparent;
+  color: #ffffff;
+}
+
+.alpha-command {
+  display: grid;
+  border-top: 7px solid #2c3748;
+}
+
+.alpha-command div {
+  display: grid;
+  gap: 8px;
+  min-height: 96px;
+  padding: 18px 0;
+  border-bottom: 1px solid #2c3748;
+}
+
+.alpha-command span {
+  color: #9fb0c5;
+  font-size: 0.78rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.alpha-command strong {
+  color: #ffffff;
+  font-size: 1.5rem;
+}
+
+.alpha-command em {
+  color: #c7d3e1;
+  font-size: 0.9rem;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.alpha-score-model {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: 56px;
+  align-items: start;
+  padding: 58px 0;
+}
+
+.score-factor-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  border-top: 7px solid #dfe4ea;
+  background: #ffffff;
+}
+
+.score-factor {
+  min-height: 160px;
+  padding: 20px;
+  border-right: 1px solid #e5e9ef;
+  border-bottom: 1px solid #e5e9ef;
+}
+
+.score-factor:last-child {
+  border-right: 0;
+}
+
+.score-factor strong {
+  display: block;
+  color: #233cff;
+  font-size: 1.45rem;
+  line-height: 1;
+}
+
+.score-factor h3 {
+  margin: 18px 0 0;
+  color: #000000;
+  font-size: 1rem;
+}
+
+.score-factor p {
+  margin: 10px 0 0;
+  color: #5f6b7a;
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.alpha-main-grid {
+  display: grid;
+  grid-template-columns: 420px minmax(0, 1fr);
+  gap: 54px;
+  align-items: start;
+  padding-bottom: 54px;
+}
+
+.alpha-submit-panel {
+  display: grid;
+  gap: 20px;
+  padding: 28px;
+  border: 1px solid #dfe4ea;
+  border-top: 7px solid #111722;
+  background: #ffffff;
+}
+
+.alpha-submit-panel .panel-heading {
+  padding: 0 0 18px;
+}
+
+.alpha-submit-panel .panel-heading h2 {
+  font-size: 1.85rem;
+}
+
+.alpha-submit-panel label {
+  display: grid;
+  gap: 8px;
+  color: #5f6b7a;
+  font-size: 0.78rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.alpha-submit-panel input {
+  min-height: 46px;
+  padding: 0 12px;
+  border: 1px solid #cfd6df;
+  background: #ffffff;
+  color: #000000;
+  font-weight: 780;
+}
+
+.line-entry-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.pick-line {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) minmax(112px, 0.72fr);
+  gap: 12px;
+  align-items: end;
+  padding: 14px;
+  border: 1px solid #e5e9ef;
+  background: #fafbfc;
+}
+
+.pick-line > span {
+  display: grid;
+  place-items: center;
+  min-height: 46px;
+  background: #111722;
+  color: #ffffff;
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.alpha-submit-panel button {
+  min-height: 48px;
+  border: 0;
+  background: #000000;
+  color: #ffffff;
+  font-weight: 880;
+  cursor: pointer;
+}
+
+.alpha-dashboard {
+  display: grid;
+  gap: 30px;
+}
+
+.alpha-dashboard .alpha-stats {
+  border-top-color: #111722;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.alpha-board-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 54px;
+  padding-bottom: 72px;
+}
+
+.alpha-board-grid .alpha-panel,
+.alpha-dashboard .alpha-panel {
+  border: 1px solid #dfe4ea;
+  border-top: 7px solid #dfe4ea;
+  padding: 0 22px;
+}
+
+.weights-panel {
+  min-height: 420px;
+}
+
+.weight-row {
+  grid-template-columns: 34px 130px minmax(0, 1fr) 70px;
+}
+
+.weight-row small {
+  color: #8a94a3;
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.guardrail-list {
+  display: grid;
+}
+
 .alpha-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 390px;
@@ -512,6 +770,10 @@ h2 {
   display: block;
   height: 100%;
   background: #233cff;
+}
+
+.weights-panel .weight-row {
+  grid-template-columns: 34px 130px minmax(0, 1fr) 70px;
 }
 
 .member-row {
@@ -885,6 +1147,10 @@ td + td {
 
   .hero-grid,
   .overview-layout,
+  .alpha-hero-grid,
+  .alpha-score-model,
+  .alpha-main-grid,
+  .alpha-board-grid,
   .alpha-layout,
   .premium-grid,
   .faq-layout {
@@ -899,7 +1165,8 @@ td + td {
   .why-grid,
   .document-links,
   .alpha-stats,
-  .alpha-columns {
+  .alpha-columns,
+  .score-factor-grid {
     grid-template-columns: 1fr;
   }
 
@@ -967,6 +1234,7 @@ td + td {
   .performance-row,
   .weight-row,
   .member-row,
+  .pick-line,
   .pick-grid {
     grid-template-columns: 1fr;
     gap: 6px;

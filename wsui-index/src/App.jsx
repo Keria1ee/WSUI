@@ -11,6 +11,7 @@ const themeLabels = {
 };
 
 export default function App() {
+  const isAlphaPage = window.location.pathname.replace(/\/+$/, '') === '/alpha';
   const [health, setHealth] = useState(null);
   const [password, setPassword] = useState(() => sessionStorage.getItem(PASSWORD_KEY) || '');
   const [snapshot, setSnapshot] = useState(null);
@@ -155,7 +156,7 @@ export default function App() {
 
   return (
     <main>
-      <Header />
+      <Header currentPage={isAlphaPage ? 'alpha' : 'home'} />
 
       {snapshot.source.mode !== 'market' && (
         <div className="system-banner">
@@ -169,16 +170,22 @@ export default function App() {
         </div>
       )}
 
+      {isAlphaPage ? (
+        <>
+          <AlphaEnginePage
+            alpha={alpha}
+            form={alphaForm}
+            message={alphaMessage}
+            onFormChange={setAlphaForm}
+            onSubmit={submitAlphaPicks}
+          />
+          <Footer snapshot={snapshot} />
+        </>
+      ) : (
+        <>
       <Hero snapshot={snapshot} holdings={sortedByTarget} />
       <AnchorNav />
       <OverviewSection snapshot={snapshot} />
-      <AlphaEngineSection
-        alpha={alpha}
-        form={alphaForm}
-        message={alphaMessage}
-        onFormChange={setAlphaForm}
-        onSubmit={submitAlphaPicks}
-      />
       <HoldingsSection snapshot={snapshot} holdings={sortedByTarget} />
       <PerformanceSection
         snapshot={snapshot}
@@ -190,23 +197,25 @@ export default function App() {
       <PremiumDiscountSection snapshot={snapshot} />
       <FaqSection snapshot={snapshot} />
       <Footer snapshot={snapshot} />
+        </>
+      )}
     </main>
   );
 }
 
-function Header() {
+function Header({ currentPage }) {
   return (
     <header className="site-header">
       <div className="page-shell header-inner">
-        <a className="wordmark" href="#top" aria-label="WSUI home">
+        <a className="wordmark" href="/" aria-label="WSUI home">
           <span>WSUI</span>
         </a>
         <nav className="primary-nav">
-          <a href="#overview">Our Index</a>
-          <a href="#alpha-engine">Alpha Engine</a>
-          <a href="#holdings">Holdings</a>
-          <a href="#performance">Performance</a>
-          <a href="#faq">FAQ</a>
+          <a className={currentPage === 'home' ? 'active' : ''} href="/#overview">Our Index</a>
+          <a className={currentPage === 'alpha' ? 'active' : ''} href="/alpha">Alpha Engine</a>
+          <a href="/#holdings">Holdings</a>
+          <a href="/#performance">Performance</a>
+          <a href="/#faq">FAQ</a>
         </nav>
       </div>
     </header>
@@ -226,7 +235,7 @@ function Hero({ snapshot, holdings }) {
           </p>
           <div className="hero-buttons">
             <a className="button primary-button" href="#holdings">View Holdings</a>
-            <a className="button ghost-button" href="#documents">Fact Sheet</a>
+            <a className="button ghost-button" href="/alpha">Enter Alpha Engine</a>
           </div>
         </div>
 
@@ -254,7 +263,6 @@ function AnchorNav() {
     <nav className="anchor-nav" aria-label="Page sections">
       <div className="page-shell anchor-inner">
         <a href="#overview">Overview</a>
-        <a href="#alpha-engine">Alpha Engine</a>
         <a href="#holdings">Top Holdings</a>
         <a href="#performance">Performance</a>
         <a href="#documents">Documents</a>
@@ -316,31 +324,71 @@ function DetailRow({ label, value }) {
   );
 }
 
-function AlphaEngineSection({ alpha, form, message, onFormChange, onSubmit }) {
+function AlphaEnginePage({ alpha, form, message, onFormChange, onSubmit }) {
   const topWeights = alpha?.nextWeights?.slice(0, 8) || [];
   const members = alpha?.members || [];
+  const leader = alpha?.stats?.alphaLeader;
 
   return (
-    <section className="section alpha-section" id="alpha-engine">
-      <div className="page-shell alpha-layout">
-        <div className="alpha-intro">
-          <p className="fund-type">Interactive Weighting</p>
-          <h2>Alpha Engine</h2>
-          <p className="large-copy">
-            Each member submits two different tickers. The engine scores every pick using 7-day return,
-            cost-basis return, volatility, and chase risk, then lets stronger contributors carry more
-            weight into the next WSUI consensus.
-          </p>
-          <div className="alpha-rules">
-            <DetailRow label="Round Length" value={`${alpha?.settings?.roundLengthDays || 7} Days`} />
-            <DetailRow label="Influence Range" value={`${formatNumber(alpha?.settings?.minInfluence || 0.3)}x - ${formatNumber(alpha?.settings?.maxInfluence || 3)}x`} />
-            <DetailRow label="Smoothing" value={formatAbsolutePercent((alpha?.settings?.smoothing || 0) * 100)} />
-            <DetailRow label="Ticker Cap" value={formatAbsolutePercent((alpha?.settings?.maxTickerWeight || 0) * 100)} />
+    <section className="alpha-page" id="alpha-engine">
+      <div className="alpha-hero-band">
+        <div className="page-shell alpha-hero-grid">
+          <div className="alpha-hero-copy">
+            <p className="fund-type">WSUI Alpha Lab</p>
+            <h1>Contributor Alpha Engine</h1>
+            <p>
+              Two lines per member. Cost matters. Momentum matters. Risk matters. The engine prices each
+              contributor's recent skill into the next WSUI consensus instead of counting every pick equally.
+            </p>
+            <div className="alpha-hero-actions">
+              <a className="button primary-button" href="#submit-picks">Submit Picks</a>
+              <a className="button ghost-button" href="/">Back to Index</a>
+            </div>
+          </div>
+
+          <div className="alpha-command">
+            <div>
+              <span>Next Rebalance</span>
+              <strong>{alpha?.round?.nextRebalanceAt ? formatDate(alpha.round.nextRebalanceAt) : 'N/A'}</strong>
+              <em>{alpha?.round?.daysRemaining ?? 0} days remaining</em>
+            </div>
+            <div>
+              <span>Alpha Leader</span>
+              <strong>{leader?.name || 'Open'}</strong>
+              <em>{leader ? `${formatPercent(leader.sevenDayReturn * 100)} 7D` : 'Waiting for picks'}</em>
+            </div>
+            <div>
+              <span>Unity Score</span>
+              <strong>{formatAbsolutePercent((alpha?.stats?.unityScore || 0) * 100)}</strong>
+              <em>top three next weights</em>
+            </div>
           </div>
         </div>
+      </div>
 
-        <form className="alpha-form" onSubmit={onSubmit}>
-          <h3>Submit Your Two Lines</h3>
+      <div className="page-shell alpha-score-model">
+        <div>
+          <p className="fund-type">Scoring Model</p>
+          <h2>Economic Weighting, Not Voting</h2>
+        </div>
+        <div className="score-factor-grid">
+          <ScoreFactor value="42%" label="7D return" text="Recent market performance rewards timely picks." />
+          <ScoreFactor value="42%" label="Cost return" text="A member's stated basis affects the economic score." />
+          <ScoreFactor value="-16%" label="Volatility" text="Unstable picks carry a risk drag." />
+          <ScoreFactor value="Penalty" label="Chase risk" text="Extended names near recent highs get a small haircut." />
+        </div>
+      </div>
+
+      <div className="page-shell alpha-main-grid">
+        <form className="alpha-submit-panel" id="submit-picks" onSubmit={onSubmit}>
+          <div className="panel-heading">
+            <div>
+              <p className="fund-type">Your Allocation Lines</p>
+              <h2>Submit Picks</h2>
+            </div>
+            <span>2 different tickers</span>
+          </div>
+
           <label>
             Member Name
             <input
@@ -349,66 +397,48 @@ function AlphaEngineSection({ alpha, form, message, onFormChange, onSubmit }) {
               placeholder="Your group name"
             />
           </label>
-          <div className="pick-grid">
-            <label>
-              Line 1 Ticker
-              <input
-                value={form.pickA}
-                onChange={(event) => onFormChange({ ...form, pickA: event.target.value.toUpperCase() })}
-                placeholder="NVDA"
-              />
-            </label>
-            <label>
-              Cost
-              <input
-                inputMode="decimal"
-                value={form.costA}
-                onChange={(event) => onFormChange({ ...form, costA: event.target.value })}
-                placeholder="optional"
-              />
-            </label>
-            <label>
-              Line 2 Ticker
-              <input
-                value={form.pickB}
-                onChange={(event) => onFormChange({ ...form, pickB: event.target.value.toUpperCase() })}
-                placeholder="MU"
-              />
-            </label>
-            <label>
-              Cost
-              <input
-                inputMode="decimal"
-                value={form.costB}
-                onChange={(event) => onFormChange({ ...form, costB: event.target.value })}
-                placeholder="optional"
-              />
-            </label>
+
+          <div className="line-entry-grid">
+            <PickLine
+              number="01"
+              ticker={form.pickA}
+              cost={form.costA}
+              tickerPlaceholder="NVDA"
+              onTickerChange={(value) => onFormChange({ ...form, pickA: value.toUpperCase() })}
+              onCostChange={(value) => onFormChange({ ...form, costA: value })}
+            />
+            <PickLine
+              number="02"
+              ticker={form.pickB}
+              cost={form.costB}
+              tickerPlaceholder="MU"
+              onTickerChange={(value) => onFormChange({ ...form, pickB: value.toUpperCase() })}
+              onCostChange={(value) => onFormChange({ ...form, costB: value })}
+            />
           </div>
+
           <button type="submit">Save Picks</button>
           {message && <p className={message.includes('saved') ? 'alpha-message' : 'alpha-error'}>{message}</p>}
-          <p className="form-help">The two lines cannot be the same. Empty costs use the current market price as your basis.</p>
+          <p className="form-help">Empty costs are locked at the market price when submitted. Same-member duplicate tickers are rejected.</p>
         </form>
-      </div>
 
-      <div className="page-shell alpha-output">
-        <div className="alpha-stats">
-          <StatTile label="Members" value={String(alpha?.stats?.memberCount || 0)} />
-          <StatTile label="Tickers" value={String(alpha?.stats?.tickerCount || 0)} />
-          <StatTile label="Unity Score" value={formatAbsolutePercent((alpha?.stats?.unityScore || 0) * 100)} />
-          <StatTile label="Next Rebalance" value={alpha?.round?.nextRebalanceAt ? formatDate(alpha.round.nextRebalanceAt) : 'N/A'} />
-        </div>
+        <div className="alpha-dashboard">
+          <div className="alpha-stats">
+            <StatTile label="Members" value={String(alpha?.stats?.memberCount || 0)} />
+            <StatTile label="Tickers" value={String(alpha?.stats?.tickerCount || 0)} />
+            <StatTile label="Max Ticker" value={formatAbsolutePercent((alpha?.settings?.maxTickerWeight || 0) * 100)} />
+          </div>
 
-        <div className="alpha-columns">
-          <div className="alpha-panel">
+          <div className="alpha-panel weights-panel">
             <div className="panel-heading">
               <h3>Next WSUI Weights</h3>
-              <span>{alpha?.round?.daysRemaining ?? 0} days left</span>
+              <span>preview</span>
             </div>
             {topWeights.length ? (
               <div className="weight-list">
-                {topWeights.map((holding) => (
+                {topWeights.map((holding, index) => (
                   <div className="weight-row" key={holding.symbol}>
+                    <small>{String(index + 1).padStart(2, '0')}</small>
                     <div>
                       <strong>{holding.symbol}</strong>
                       <span>{holding.theme}</span>
@@ -421,14 +451,17 @@ function AlphaEngineSection({ alpha, form, message, onFormChange, onSubmit }) {
                 ))}
               </div>
             ) : (
-              <p className="empty-state">No member picks yet. Submit the first two lines to start the alpha round.</p>
+              <p className="empty-state">Submit the first two lines to start the alpha round.</p>
             )}
           </div>
+        </div>
+      </div>
 
-          <div className="alpha-panel">
+      <div className="page-shell alpha-board-grid">
+        <div className="alpha-panel">
             <div className="panel-heading">
               <h3>Contributor Alpha Board</h3>
-              <span>score-driven</span>
+            <span>score-driven influence</span>
             </div>
             {members.length ? (
               <div className="member-list">
@@ -450,9 +483,56 @@ function AlphaEngineSection({ alpha, form, message, onFormChange, onSubmit }) {
               <p className="empty-state">The board fills in as members submit picks.</p>
             )}
           </div>
+
+        <div className="alpha-panel">
+          <div className="panel-heading">
+            <h3>Risk Controls</h3>
+            <span>guardrails</span>
+          </div>
+          <div className="guardrail-list">
+            <DetailRow label="Round Length" value={`${alpha?.settings?.roundLengthDays || 7} Days`} />
+            <DetailRow label="Influence Range" value={`${formatNumber(alpha?.settings?.minInfluence || 0.3)}x - ${formatNumber(alpha?.settings?.maxInfluence || 3)}x`} />
+            <DetailRow label="Smoothing" value={formatAbsolutePercent((alpha?.settings?.smoothing || 0) * 100)} />
+            <DetailRow label="Ticker Cap" value={formatAbsolutePercent((alpha?.settings?.maxTickerWeight || 0) * 100)} />
+          </div>
         </div>
       </div>
     </section>
+  );
+}
+
+function ScoreFactor({ value, label, text }) {
+  return (
+    <article className="score-factor">
+      <strong>{value}</strong>
+      <h3>{label}</h3>
+      <p>{text}</p>
+    </article>
+  );
+}
+
+function PickLine({ number, ticker, cost, tickerPlaceholder, onTickerChange, onCostChange }) {
+  return (
+    <div className="pick-line">
+      <span>{number}</span>
+      <label>
+        Ticker
+        <input
+          value={ticker}
+          onChange={(event) => onTickerChange(event.target.value)}
+          placeholder={tickerPlaceholder}
+        />
+      </label>
+      <label>
+        Cost Basis
+        <input
+          inputMode="decimal"
+          value={cost}
+          onChange={(event) => onCostChange(event.target.value)}
+          placeholder="optional"
+        />
+      </label>
+    </div>
   );
 }
 
