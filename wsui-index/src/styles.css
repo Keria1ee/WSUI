@@ -479,8 +479,8 @@ h2 {
 
 .alpha-submit-panel {
   display: grid;
-  gap: 20px;
-  padding: 28px;
+  gap: 16px;
+  padding: 24px;
   border: 1px solid #dfe4ea;
   border-top: 7px solid #111722;
   background: #ffffff;
@@ -491,7 +491,7 @@ h2 {
 }
 
 .alpha-submit-panel .panel-heading h2 {
-  font-size: 1.85rem;
+  font-size: 1.72rem;
 }
 
 .alpha-submit-panel label {
@@ -504,8 +504,8 @@ h2 {
 }
 
 .alpha-submit-panel input {
-  min-height: 46px;
-  padding: 0 12px;
+  min-height: 40px;
+  padding: 0 11px;
   border: 1px solid #cfd6df;
   background: #ffffff;
   color: #000000;
@@ -514,15 +514,15 @@ h2 {
 
 .line-entry-grid {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .pick-line {
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) minmax(112px, 0.72fr);
-  gap: 12px;
-  align-items: end;
-  padding: 14px;
+  grid-template-columns: 38px minmax(116px, 0.62fr) minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
   border: 1px solid #e5e9ef;
   background: #fafbfc;
 }
@@ -530,15 +530,50 @@ h2 {
 .pick-line > span {
   display: grid;
   place-items: center;
-  min-height: 46px;
+  min-height: 40px;
   background: #111722;
   color: #ffffff;
-  font-size: 0.82rem;
+  font-size: 0.78rem;
   font-weight: 900;
 }
 
+.pick-line label {
+  gap: 6px;
+}
+
+.pick-line p {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px dashed #cfd6df;
+  background: #ffffff;
+  color: #5f6b7a;
+  font-size: 0.82rem;
+  font-weight: 780;
+  text-align: center;
+  text-transform: none;
+}
+
+.auto-basis-callout {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid #dfe4ea;
+  background: #f4f6f8;
+}
+
+.auto-basis-callout strong {
+  color: #111722;
+  font-size: 0.9rem;
+}
+
+.auto-basis-callout span {
+  color: #5f6b7a;
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
 .alpha-submit-panel button {
-  min-height: 48px;
+  min-height: 44px;
   border: 0;
   background: #000000;
   color: #ffffff;

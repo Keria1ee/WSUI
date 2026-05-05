@@ -36,7 +36,7 @@ That writes real `inceptionPrice` values into `data/fund.json`, making WSUI beha
 
 ## Alpha Engine
 
-Members can submit two different tickers with optional cost basis values. If a cost basis is omitted, the server locks the market price at submission time as that pick's basis. The next WSUI consensus is calculated from:
+Members submit two different tickers. The server always locks the market price at submission time as each pick's cost basis; members cannot manually enter cost basis values. The next WSUI consensus is calculated from:
 
 - 7-day market return
 - Return versus each member's cost basis

@@ -269,11 +269,11 @@ function normalizeMemberSubmission(body) {
   const picks = [
     {
       symbol: normalizeTicker(body.pickA || body.picks?.[0]?.symbol || body.picks?.[0]),
-      costBasis: normalizeCostBasis(body.costA || body.picks?.[0]?.costBasis)
+      costBasis: null
     },
     {
       symbol: normalizeTicker(body.pickB || body.picks?.[1]?.symbol || body.picks?.[1]),
-      costBasis: normalizeCostBasis(body.costB || body.picks?.[1]?.costBasis)
+      costBasis: null
     }
   ];
 

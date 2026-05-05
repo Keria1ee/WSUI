@@ -18,7 +18,7 @@ export default function App() {
   const [history, setHistory] = useState(null);
   const [alpha, setAlpha] = useState(null);
   const [performanceView, setPerformanceView] = useState('marketPrice');
-  const [alphaForm, setAlphaForm] = useState({ name: '', pickA: 'NVDA', costA: '', pickB: 'MU', costB: '' });
+  const [alphaForm, setAlphaForm] = useState({ name: '', pickA: 'NVDA', pickB: 'MU' });
   const [alphaMessage, setAlphaMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -373,7 +373,7 @@ function AlphaEnginePage({ alpha, form, message, onFormChange, onSubmit }) {
         </div>
         <div className="score-factor-grid">
           <ScoreFactor value="42%" label="7D return" text="Recent market performance rewards timely picks." />
-          <ScoreFactor value="42%" label="Cost return" text="A member's stated basis affects the economic score." />
+          <ScoreFactor value="42%" label="Cost return" text="The market price at submission time becomes the locked basis." />
           <ScoreFactor value="-16%" label="Volatility" text="Unstable picks carry a risk drag." />
           <ScoreFactor value="Penalty" label="Chase risk" text="Extended names near recent highs get a small haircut." />
         </div>
@@ -398,28 +398,29 @@ function AlphaEnginePage({ alpha, form, message, onFormChange, onSubmit }) {
             />
           </label>
 
+          <div className="auto-basis-callout">
+            <strong>Cost basis is automatic</strong>
+            <span>Each line locks the market price at the moment you submit.</span>
+          </div>
+
           <div className="line-entry-grid">
             <PickLine
               number="01"
               ticker={form.pickA}
-              cost={form.costA}
               tickerPlaceholder="NVDA"
               onTickerChange={(value) => onFormChange({ ...form, pickA: value.toUpperCase() })}
-              onCostChange={(value) => onFormChange({ ...form, costA: value })}
             />
             <PickLine
               number="02"
               ticker={form.pickB}
-              cost={form.costB}
               tickerPlaceholder="MU"
               onTickerChange={(value) => onFormChange({ ...form, pickB: value.toUpperCase() })}
-              onCostChange={(value) => onFormChange({ ...form, costB: value })}
             />
           </div>
 
           <button type="submit">Save Picks</button>
           {message && <p className={message.includes('saved') ? 'alpha-message' : 'alpha-error'}>{message}</p>}
-          <p className="form-help">Empty costs are locked at the market price when submitted. Same-member duplicate tickers are rejected.</p>
+          <p className="form-help">Cost basis is locked from the backend market price at submission time. Same-member duplicate tickers are rejected.</p>
         </form>
 
         <div className="alpha-dashboard">
@@ -511,7 +512,7 @@ function ScoreFactor({ value, label, text }) {
   );
 }
 
-function PickLine({ number, ticker, cost, tickerPlaceholder, onTickerChange, onCostChange }) {
+function PickLine({ number, ticker, tickerPlaceholder, onTickerChange }) {
   return (
     <div className="pick-line">
       <span>{number}</span>
@@ -523,15 +524,7 @@ function PickLine({ number, ticker, cost, tickerPlaceholder, onTickerChange, onC
           placeholder={tickerPlaceholder}
         />
       </label>
-      <label>
-        Cost Basis
-        <input
-          inputMode="decimal"
-          value={cost}
-          onChange={(event) => onCostChange(event.target.value)}
-          placeholder="optional"
-        />
-      </label>
+      <p>basis locks at submit</p>
     </div>
   );
 }
