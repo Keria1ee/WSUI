@@ -1,0 +1,34 @@
+# WSUI - West Side Unity Index
+
+Internal simulated U.S. equity index page for the West Side Unity Index.
+
+## Run Locally
+
+```bash
+npm install
+npm run dev
+```
+
+Frontend: `http://127.0.0.1:5173`  
+API: `http://127.0.0.1:8787`
+
+## Market Data
+
+Create `.env` from `.env.example` and add:
+
+```bash
+FINNHUB_API_KEY=your_key_here
+GROUP_PASSWORD=optional_group_password
+```
+
+Without `FINNHUB_API_KEY`, the app uses clearly labeled demo quotes so the page can still be viewed.
+
+## Freeze Launch Prices
+
+After adding a real Finnhub key, run this once at the official launch snapshot:
+
+```bash
+npm run freeze-baseline
+```
+
+That writes real `inceptionPrice` values into `data/fund.json`, making WSUI behave like a target-weight launch basket that drifts with market prices.

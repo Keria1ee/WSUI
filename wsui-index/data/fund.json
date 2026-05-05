@@ -1,0 +1,56 @@
+{
+  "ticker": "WSUI",
+  "name": "West Side Unity Index",
+  "type": "Simulated U.S. Equity Index",
+  "theme": "AI Infrastructure",
+  "inceptionDate": "2026-05-05",
+  "initialNav": 100,
+  "benchmark": {
+    "symbol": "QQQ",
+    "name": "Invesco QQQ Trust",
+    "inceptionPrice": null
+  },
+  "methodology": {
+    "rebalanceFrequency": "Manual group rebalance",
+    "weighting": "Target-weight launch portfolio with drift after inception",
+    "access": "Internal group simulation"
+  },
+  "holdings": [
+    {
+      "symbol": "NVDA",
+      "name": "NVIDIA Corporation",
+      "theme": "AI Compute",
+      "targetWeight": 0.3,
+      "inceptionPrice": null
+    },
+    {
+      "symbol": "SNDK",
+      "name": "Sandisk Corporation",
+      "theme": "Storage",
+      "targetWeight": 0.2,
+      "inceptionPrice": null
+    },
+    {
+      "symbol": "MU",
+      "name": "Micron Technology, Inc.",
+      "theme": "Memory",
+      "targetWeight": 0.15,
+      "inceptionPrice": null
+    },
+    {
+      "symbol": "ORCL",
+      "name": "Oracle Corporation",
+      "theme": "Cloud Infrastructure",
+      "targetWeight": 0.15,
+      "inceptionPrice": null
+    },
+    {
+      "symbol": "INTC",
+      "name": "Intel Corporation",
+      "theme": "Semiconductor Manufacturing",
+      "targetWeight": 0.2,
+      "inceptionPrice": null
+    }
+  ],
+  "disclaimer": "WSUI is a private group simulation for education and discussion only. It is not a registered security, fund, ETF, or investment product, and it does not constitute investment advice."
+}
