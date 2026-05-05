@@ -326,6 +326,217 @@ h2 {
   text-align: right;
 }
 
+.alpha-section {
+  background: #fbfbfb;
+}
+
+.alpha-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 390px;
+  gap: 72px;
+  align-items: start;
+}
+
+.alpha-rules {
+  display: grid;
+  max-width: 620px;
+  margin-top: 34px;
+  border-top: 7px solid #efefef;
+  background: #ffffff;
+}
+
+.alpha-form {
+  display: grid;
+  gap: 18px;
+  padding: 26px;
+  border: 1px solid #e5e5e5;
+  background: #ffffff;
+}
+
+.alpha-form h3,
+.alpha-panel h3 {
+  margin: 0;
+  color: #000000;
+  font-size: 1.18rem;
+}
+
+.alpha-form label {
+  display: grid;
+  gap: 8px;
+  color: #6b7582;
+  font-size: 0.82rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.alpha-form input {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid #d7d7d7;
+  background: #ffffff;
+  color: #000000;
+  font-weight: 750;
+}
+
+.pick-grid {
+  display: grid;
+  grid-template-columns: 1fr 0.8fr;
+  gap: 14px;
+}
+
+.alpha-form button {
+  min-height: 46px;
+  border: 0;
+  background: #000000;
+  color: #ffffff;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.form-help,
+.alpha-message,
+.alpha-error {
+  margin: 0;
+  color: #6b7582;
+  font-size: 0.84rem;
+  line-height: 1.55;
+}
+
+.alpha-message {
+  color: #04845f;
+  font-weight: 800;
+}
+
+.alpha-error {
+  color: #c53333;
+  font-weight: 800;
+}
+
+.alpha-output {
+  margin-top: 42px;
+}
+
+.alpha-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  border-top: 7px solid #efefef;
+  background: #ffffff;
+}
+
+.stat-tile {
+  display: grid;
+  gap: 10px;
+  min-height: 92px;
+  padding: 18px;
+  border-right: 1px solid #eeeeee;
+  border-bottom: 1px solid #eeeeee;
+}
+
+.stat-tile:last-child {
+  border-right: 0;
+}
+
+.stat-tile span,
+.panel-heading span,
+.weight-row span,
+.member-row span {
+  color: #6b7582;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.stat-tile strong {
+  color: #000000;
+  font-size: 1.35rem;
+}
+
+.alpha-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 42px;
+  margin-top: 38px;
+}
+
+.alpha-panel {
+  display: grid;
+  align-content: start;
+  border-top: 7px solid #efefef;
+  background: #ffffff;
+}
+
+.panel-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 18px 0;
+  border-bottom: 1px solid #eeeeee;
+}
+
+.weight-list,
+.member-list {
+  display: grid;
+}
+
+.weight-row,
+.member-row {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr) 64px;
+  gap: 18px;
+  align-items: center;
+  min-height: 68px;
+  border-bottom: 1px solid #eeeeee;
+}
+
+.weight-row strong,
+.member-row strong {
+  display: block;
+  color: #000000;
+}
+
+.weight-row em,
+.member-metrics em {
+  color: #000000;
+  font-style: normal;
+  font-weight: 850;
+  text-align: right;
+}
+
+.weight-bar {
+  height: 8px;
+  background: #eeeeee;
+}
+
+.weight-bar span {
+  display: block;
+  height: 100%;
+  background: #233cff;
+}
+
+.member-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.member-metrics {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.member-metrics strong {
+  min-width: 54px;
+  text-align: right;
+}
+
+.empty-state {
+  margin: 0;
+  padding: 22px 0;
+  border-bottom: 1px solid #eeeeee;
+  color: #6b7582;
+  line-height: 1.6;
+}
+
 .section-heading {
   display: flex;
   align-items: flex-end;
@@ -674,6 +885,7 @@ td + td {
 
   .hero-grid,
   .overview-layout,
+  .alpha-layout,
   .premium-grid,
   .faq-layout {
     grid-template-columns: 1fr;
@@ -685,7 +897,9 @@ td + td {
   }
 
   .why-grid,
-  .document-links {
+  .document-links,
+  .alpha-stats,
+  .alpha-columns {
     grid-template-columns: 1fr;
   }
 
@@ -750,10 +964,19 @@ td + td {
   }
 
   .detail-row,
-  .performance-row {
+  .performance-row,
+  .weight-row,
+  .member-row,
+  .pick-grid {
     grid-template-columns: 1fr;
     gap: 6px;
     padding: 14px 0;
+  }
+
+  .member-metrics {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
   }
 
   .detail-row strong {

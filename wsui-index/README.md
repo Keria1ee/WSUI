@@ -32,3 +32,15 @@ npm run freeze-baseline
 ```
 
 That writes real `inceptionPrice` values into `data/fund.json`, making WSUI behave like a target-weight launch basket that drifts with market prices.
+
+## Alpha Engine
+
+Members can submit two different tickers with optional cost basis values. The next WSUI consensus is calculated from:
+
+- 7-day market return
+- Return versus each member's cost basis
+- Volatility penalty
+- Chase-risk penalty when a pick is extended in its recent range
+- Contributor influence, updated from relative composite score
+
+The engine previews next-round weights with smoothing and a single-ticker cap. Member picks are stored in `data/picks.json`.

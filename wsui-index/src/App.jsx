@@ -15,7 +15,10 @@ export default function App() {
   const [password, setPassword] = useState(() => sessionStorage.getItem(PASSWORD_KEY) || '');
   const [snapshot, setSnapshot] = useState(null);
   const [history, setHistory] = useState(null);
+  const [alpha, setAlpha] = useState(null);
   const [performanceView, setPerformanceView] = useState('marketPrice');
+  const [alphaForm, setAlphaForm] = useState({ name: '', pickA: 'NVDA', costA: '', pickB: 'MU', costB: '' });
+  const [alphaMessage, setAlphaMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -40,10 +43,15 @@ export default function App() {
     const load = async () => {
       try {
         setLoading(true);
-        const [snapshotData, historyData] = await Promise.all([apiGet('/api/snapshot'), apiGet('/api/history')]);
+        const [snapshotData, historyData, alphaData] = await Promise.all([
+          apiGet('/api/snapshot'),
+          apiGet('/api/history'),
+          apiGet('/api/alpha')
+        ]);
         if (isMounted) {
           setSnapshot(snapshotData);
           setHistory(historyData);
+          setAlpha(alphaData);
           setError('');
         }
       } catch (requestError) {
@@ -87,6 +95,43 @@ export default function App() {
     return response.json();
   }
 
+  async function apiPost(path, body) {
+    const response = await fetch(path, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        ...(password ? { 'x-wsui-password': password } : {})
+      },
+      body: JSON.stringify(body)
+    });
+
+    if (response.status === 401) {
+      sessionStorage.removeItem(PASSWORD_KEY);
+      setPassword('');
+      throw new Error('Password required');
+    }
+
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(data.message || `Request failed: ${response.status}`);
+    }
+
+    return data;
+  }
+
+  async function submitAlphaPicks(event) {
+    event.preventDefault();
+    setAlphaMessage('');
+
+    try {
+      const nextAlpha = await apiPost('/api/alpha/picks', alphaForm);
+      setAlpha(nextAlpha);
+      setAlphaMessage('Picks saved. Your next-round influence is now recalculated.');
+    } catch (requestError) {
+      setAlphaMessage(requestError.message);
+    }
+  }
+
   function handlePasswordSubmit(nextPassword) {
     sessionStorage.setItem(PASSWORD_KEY, nextPassword);
     setPassword(nextPassword);
@@ -127,6 +172,13 @@ export default function App() {
       <Hero snapshot={snapshot} holdings={sortedByTarget} />
       <AnchorNav />
       <OverviewSection snapshot={snapshot} />
+      <AlphaEngineSection
+        alpha={alpha}
+        form={alphaForm}
+        message={alphaMessage}
+        onFormChange={setAlphaForm}
+        onSubmit={submitAlphaPicks}
+      />
       <HoldingsSection snapshot={snapshot} holdings={sortedByTarget} />
       <PerformanceSection
         snapshot={snapshot}
@@ -151,6 +203,7 @@ function Header() {
         </a>
         <nav className="primary-nav">
           <a href="#overview">Our Index</a>
+          <a href="#alpha-engine">Alpha Engine</a>
           <a href="#holdings">Holdings</a>
           <a href="#performance">Performance</a>
           <a href="#faq">FAQ</a>
@@ -201,6 +254,7 @@ function AnchorNav() {
     <nav className="anchor-nav" aria-label="Page sections">
       <div className="page-shell anchor-inner">
         <a href="#overview">Overview</a>
+        <a href="#alpha-engine">Alpha Engine</a>
         <a href="#holdings">Top Holdings</a>
         <a href="#performance">Performance</a>
         <a href="#documents">Documents</a>
@@ -256,6 +310,155 @@ function Reason({ title, text }) {
 function DetailRow({ label, value }) {
   return (
     <div className="detail-row">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function AlphaEngineSection({ alpha, form, message, onFormChange, onSubmit }) {
+  const topWeights = alpha?.nextWeights?.slice(0, 8) || [];
+  const members = alpha?.members || [];
+
+  return (
+    <section className="section alpha-section" id="alpha-engine">
+      <div className="page-shell alpha-layout">
+        <div className="alpha-intro">
+          <p className="fund-type">Interactive Weighting</p>
+          <h2>Alpha Engine</h2>
+          <p className="large-copy">
+            Each member submits two different tickers. The engine scores every pick using 7-day return,
+            cost-basis return, volatility, and chase risk, then lets stronger contributors carry more
+            weight into the next WSUI consensus.
+          </p>
+          <div className="alpha-rules">
+            <DetailRow label="Round Length" value={`${alpha?.settings?.roundLengthDays || 7} Days`} />
+            <DetailRow label="Influence Range" value={`${formatNumber(alpha?.settings?.minInfluence || 0.3)}x - ${formatNumber(alpha?.settings?.maxInfluence || 3)}x`} />
+            <DetailRow label="Smoothing" value={formatAbsolutePercent((alpha?.settings?.smoothing || 0) * 100)} />
+            <DetailRow label="Ticker Cap" value={formatAbsolutePercent((alpha?.settings?.maxTickerWeight || 0) * 100)} />
+          </div>
+        </div>
+
+        <form className="alpha-form" onSubmit={onSubmit}>
+          <h3>Submit Your Two Lines</h3>
+          <label>
+            Member Name
+            <input
+              value={form.name}
+              onChange={(event) => onFormChange({ ...form, name: event.target.value })}
+              placeholder="Your group name"
+            />
+          </label>
+          <div className="pick-grid">
+            <label>
+              Line 1 Ticker
+              <input
+                value={form.pickA}
+                onChange={(event) => onFormChange({ ...form, pickA: event.target.value.toUpperCase() })}
+                placeholder="NVDA"
+              />
+            </label>
+            <label>
+              Cost
+              <input
+                inputMode="decimal"
+                value={form.costA}
+                onChange={(event) => onFormChange({ ...form, costA: event.target.value })}
+                placeholder="optional"
+              />
+            </label>
+            <label>
+              Line 2 Ticker
+              <input
+                value={form.pickB}
+                onChange={(event) => onFormChange({ ...form, pickB: event.target.value.toUpperCase() })}
+                placeholder="MU"
+              />
+            </label>
+            <label>
+              Cost
+              <input
+                inputMode="decimal"
+                value={form.costB}
+                onChange={(event) => onFormChange({ ...form, costB: event.target.value })}
+                placeholder="optional"
+              />
+            </label>
+          </div>
+          <button type="submit">Save Picks</button>
+          {message && <p className={message.includes('saved') ? 'alpha-message' : 'alpha-error'}>{message}</p>}
+          <p className="form-help">The two lines cannot be the same. Empty costs use the current market price as your basis.</p>
+        </form>
+      </div>
+
+      <div className="page-shell alpha-output">
+        <div className="alpha-stats">
+          <StatTile label="Members" value={String(alpha?.stats?.memberCount || 0)} />
+          <StatTile label="Tickers" value={String(alpha?.stats?.tickerCount || 0)} />
+          <StatTile label="Unity Score" value={formatAbsolutePercent((alpha?.stats?.unityScore || 0) * 100)} />
+          <StatTile label="Next Rebalance" value={alpha?.round?.nextRebalanceAt ? formatDate(alpha.round.nextRebalanceAt) : 'N/A'} />
+        </div>
+
+        <div className="alpha-columns">
+          <div className="alpha-panel">
+            <div className="panel-heading">
+              <h3>Next WSUI Weights</h3>
+              <span>{alpha?.round?.daysRemaining ?? 0} days left</span>
+            </div>
+            {topWeights.length ? (
+              <div className="weight-list">
+                {topWeights.map((holding) => (
+                  <div className="weight-row" key={holding.symbol}>
+                    <div>
+                      <strong>{holding.symbol}</strong>
+                      <span>{holding.theme}</span>
+                    </div>
+                    <div className="weight-bar">
+                      <span style={{ width: `${Math.max(holding.weight * 100, 2)}%` }} />
+                    </div>
+                    <em>{formatWeight(holding.weight)}</em>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="empty-state">No member picks yet. Submit the first two lines to start the alpha round.</p>
+            )}
+          </div>
+
+          <div className="alpha-panel">
+            <div className="panel-heading">
+              <h3>Contributor Alpha Board</h3>
+              <span>score-driven</span>
+            </div>
+            {members.length ? (
+              <div className="member-list">
+                {members.map((member) => (
+                  <div className="member-row" key={member.name}>
+                    <div>
+                      <strong>{member.name}</strong>
+                      <span>{member.picks.map((pick) => `${pick.symbol} @ ${formatCurrency(pick.costBasis)}`).join(' / ')}</span>
+                    </div>
+                    <div className="member-metrics">
+                      <em>{formatPercent(member.sevenDayReturn * 100)} 7D</em>
+                      <em>{formatPercent(member.costReturn * 100)} cost</em>
+                      <strong>{formatNumber(member.projectedInfluence)}x</strong>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="empty-state">The board fills in as members submit picks.</p>
+            )}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function StatTile({ label, value }) {
+  return (
+    <div className="stat-tile">
       <span>{label}</span>
       <strong>{value}</strong>
     </div>
@@ -595,6 +798,10 @@ function formatAbsolutePercent(value) {
 
 function formatWeight(value) {
   return `${(Number(value) * 100).toFixed(1)}%`;
+}
+
+function formatNumber(value) {
+  return Number(value || 0).toFixed(2);
 }
 
 function formatDate(value) {

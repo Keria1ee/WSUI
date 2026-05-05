@@ -1,5 +1,5 @@
 import express from 'express';
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -64,6 +64,97 @@ app.get('/api/history', async (_req, res, next) => {
     const snapshot = calculateSnapshot(fund, quotesBySymbol);
     const history = await buildHistory(fund, snapshot);
     res.json(history);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/alpha', async (_req, res, next) => {
+  try {
+    const fund = await readFund();
+    const alpha = await readAlpha();
+    res.json(await calculateAlphaEngine(fund, alpha));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/alpha/picks', async (req, res, next) => {
+  try {
+    const fund = await readFund();
+    const alpha = await readAlpha();
+    const member = normalizeMemberSubmission(req.body || {});
+    member.picks = await hydratePickCosts(member.picks);
+    const now = new Date().toISOString();
+    const existingIndex = alpha.members.findIndex((entry) => entry.name.toLowerCase() === member.name.toLowerCase());
+
+    if (existingIndex >= 0) {
+      alpha.members[existingIndex] = {
+        ...alpha.members[existingIndex],
+        name: member.name,
+        picks: member.picks,
+        updatedAt: now
+      };
+    } else {
+      alpha.members.push({
+        name: member.name,
+        picks: member.picks,
+        influence: 1,
+        previousInfluence: 1,
+        joinedAt: now,
+        updatedAt: now
+      });
+    }
+
+    await writeAlpha(alpha);
+    res.json(await calculateAlphaEngine(fund, alpha));
+  } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ error: error.code, message: error.message });
+    }
+
+    next(error);
+  }
+});
+
+app.post('/api/alpha/settle', async (_req, res, next) => {
+  try {
+    const fund = await readFund();
+    const alpha = await readAlpha();
+    const calculated = await calculateAlphaEngine(fund, alpha);
+
+    if (!calculated.round.isDue) {
+      return res.status(409).json({
+        error: 'ROUND_NOT_DUE',
+        message: `Next settlement opens on ${calculated.round.nextRebalanceAt}.`
+      });
+    }
+
+    const projectedByName = Object.fromEntries(
+      calculated.members.map((member) => [member.name.toLowerCase(), member.projectedInfluence])
+    );
+
+    alpha.members = alpha.members.map((member) => {
+      const projectedInfluence = projectedByName[member.name.toLowerCase()] || Number(member.influence || 1);
+      return {
+        ...member,
+        previousInfluence: Number(member.influence || 1),
+        influence: projectedInfluence,
+        settledAt: new Date().toISOString()
+      };
+    });
+    alpha.settlements = [
+      ...(alpha.settlements || []),
+      {
+        settledAt: new Date().toISOString(),
+        weights: calculated.nextWeights,
+        memberCount: calculated.members.length
+      }
+    ].slice(-12);
+    alpha.settings.lastRebalanceAt = new Date().toISOString().slice(0, 10);
+
+    await writeAlpha(alpha);
+    res.json(await calculateAlphaEngine(fund, alpha));
   } catch (error) {
     next(error);
   }
@@ -141,10 +232,443 @@ async function readFund() {
   };
 }
 
+async function readAlpha() {
+  const fallback = {
+    settings: {
+      roundLengthDays: 7,
+      lastRebalanceAt: new Date().toISOString().slice(0, 10),
+      aggressiveness: 8,
+      minInfluence: 0.3,
+      maxInfluence: 3,
+      smoothing: 0.35,
+      maxTickerWeight: 0.35
+    },
+    members: [],
+    settlements: []
+  };
+  const alpha = JSON.parse(await readFile(path.join(dataDir, 'picks.json'), 'utf8').catch(() => JSON.stringify(fallback)));
+
+  return {
+    ...fallback,
+    ...alpha,
+    settings: {
+      ...fallback.settings,
+      ...(alpha.settings || {})
+    },
+    members: Array.isArray(alpha.members) ? alpha.members : [],
+    settlements: Array.isArray(alpha.settlements) ? alpha.settlements : []
+  };
+}
+
+async function writeAlpha(alpha) {
+  await writeFile(path.join(dataDir, 'picks.json'), `${JSON.stringify(alpha, null, 2)}\n`, 'utf8');
+}
+
+function normalizeMemberSubmission(body) {
+  const name = String(body.name || '').trim().replace(/\s+/g, ' ');
+  const picks = [
+    {
+      symbol: normalizeTicker(body.pickA || body.picks?.[0]?.symbol || body.picks?.[0]),
+      costBasis: normalizeCostBasis(body.costA || body.picks?.[0]?.costBasis)
+    },
+    {
+      symbol: normalizeTicker(body.pickB || body.picks?.[1]?.symbol || body.picks?.[1]),
+      costBasis: normalizeCostBasis(body.costB || body.picks?.[1]?.costBasis)
+    }
+  ];
+
+  if (name.length < 2 || name.length > 32) {
+    throw validationError('INVALID_MEMBER', 'Member name must be 2-32 characters.');
+  }
+
+  if (!picks[0].symbol || !picks[1].symbol) {
+    throw validationError('INVALID_PICK', 'Submit two ticker symbols.');
+  }
+
+  if (picks[0].symbol === picks[1].symbol) {
+    throw validationError('DUPLICATE_PICK', 'Choose two different tickers.');
+  }
+
+  return { name, picks };
+}
+
+async function hydratePickCosts(picks) {
+  return Promise.all(picks.map(async (pick) => {
+    if (isPositiveNumber(pick.costBasis)) {
+      return { ...pick, costBasis: Number(pick.costBasis), costSource: 'member' };
+    }
+
+    const quote = await getQuote(pick.symbol);
+    return { ...pick, costBasis: quote.price, costSource: 'market-at-submit' };
+  }));
+}
+
+function normalizeTicker(value) {
+  const ticker = String(value || '').trim().toUpperCase();
+  if (!/^[A-Z][A-Z0-9.-]{0,9}$/.test(ticker)) {
+    return '';
+  }
+
+  return ticker;
+}
+
+function normalizeCostBasis(value) {
+  if (value === undefined || value === null || value === '') {
+    return null;
+  }
+
+  const costBasis = Number(value);
+  return isPositiveNumber(costBasis) ? costBasis : null;
+}
+
+function validationError(code, message) {
+  const error = new Error(message);
+  error.code = code;
+  error.statusCode = 400;
+  return error;
+}
+
 async function getQuotesForFund(fund) {
   const symbols = [...new Set([...fund.holdings.map((holding) => holding.symbol), fund.benchmark.symbol])];
   const quoteEntries = await Promise.all(symbols.map(async (symbol) => [symbol, await getQuote(symbol)]));
   return Object.fromEntries(quoteEntries);
+}
+
+async function calculateAlphaEngine(fund, alpha) {
+  const settings = normalizeAlphaSettings(alpha.settings);
+  const members = alpha.members
+    .map(normalizeAlphaMember)
+    .filter((member) => member.picks.length === 2);
+  const symbols = [...new Set(members.flatMap((member) => member.picks.map((pick) => pick.symbol)))];
+  const marketBySymbol = await getAlphaMarketData(symbols);
+
+  const measuredMembers = members.map((member) => {
+    const picks = member.picks.map((pick) => enrichPick(pick, marketBySymbol[pick.symbol]));
+    const sevenDayReturn = average(picks.map((pick) => pick.sevenDayReturn));
+    const costReturn = average(picks.map((pick) => pick.costReturn));
+    const volatility = average(picks.map((pick) => pick.volatility));
+    const compositeScore = average(picks.map((pick) => pick.compositeScore));
+
+    return {
+      ...member,
+      picks,
+      sevenDayReturn,
+      costReturn,
+      volatility,
+      compositeScore
+    };
+  });
+
+  const medianScore = median(measuredMembers.map((member) => member.compositeScore));
+  const scoredMembers = measuredMembers
+    .map((member) => {
+      const currentInfluence = clamp(Number(member.influence || 1), settings.minInfluence, settings.maxInfluence);
+      const excessScore = member.compositeScore - medianScore;
+      const projectedInfluence = clamp(
+        currentInfluence * Math.exp(settings.aggressiveness * excessScore),
+        settings.minInfluence,
+        settings.maxInfluence
+      );
+
+      return {
+        ...member,
+        currentInfluence,
+        projectedInfluence,
+        influenceChange: projectedInfluence - currentInfluence,
+        excessScore
+      };
+    })
+    .sort((a, b) => b.compositeScore - a.compositeScore);
+
+  const rawTickerWeights = {};
+  for (const member of scoredMembers) {
+    for (const pick of member.picks) {
+      rawTickerWeights[pick.symbol] = (rawTickerWeights[pick.symbol] || 0) + (member.projectedInfluence / 2) * pick.qualityMultiplier;
+    }
+  }
+
+  const consensusWeights = normalizeWeightMap(rawTickerWeights, fund);
+  const currentWeights = Object.fromEntries(fund.holdings.map((holding) => [holding.symbol, holding.targetWeight]));
+  const smoothedWeights = smoothWeights(currentWeights, consensusWeights, settings.smoothing);
+  const nextWeights = capWeights(smoothedWeights, settings.maxTickerWeight);
+  const nextRebalanceAt = addDays(settings.lastRebalanceAt, settings.roundLengthDays);
+  const nowDate = new Date().toISOString().slice(0, 10);
+  const rankedWeights = Object.entries(nextWeights)
+    .map(([symbol, weight]) => ({
+      symbol,
+      weight,
+      consensusWeight: consensusWeights[symbol] || 0,
+      currentWeight: currentWeights[symbol] || 0,
+      ...describeSymbol(symbol, fund)
+    }))
+    .sort((a, b) => b.weight - a.weight);
+  const topWeight = rankedWeights[0] || null;
+  const topMember = scoredMembers[0] || null;
+
+  return {
+    settings,
+    round: {
+      lastRebalanceAt: settings.lastRebalanceAt,
+      nextRebalanceAt,
+      isDue: nowDate >= nextRebalanceAt,
+      daysRemaining: Math.max(0, daysBetween(nowDate, nextRebalanceAt))
+    },
+    members: scoredMembers,
+    market: Object.fromEntries(
+      Object.entries(marketBySymbol).map(([symbol, market]) => [
+        symbol,
+        {
+          symbol,
+          price: market.price,
+          sevenDayBase: market.sevenDayBase,
+          sevenDayReturn: market.sevenDayReturn,
+          volatility: market.volatility,
+          rangePosition: market.rangePosition,
+          provider: market.provider
+        }
+      ])
+    ),
+    nextWeights: rankedWeights,
+    stats: {
+      memberCount: scoredMembers.length,
+      tickerCount: rankedWeights.length,
+      medianScore,
+      topTicker: topWeight,
+      alphaLeader: topMember
+        ? {
+            name: topMember.name,
+            compositeScore: topMember.compositeScore,
+            sevenDayReturn: topMember.sevenDayReturn,
+            projectedInfluence: topMember.projectedInfluence
+          }
+        : null,
+      unityScore: rankedWeights.slice(0, 3).reduce((sum, holding) => sum + holding.weight, 0),
+      diversityScore: rankedWeights.length
+    },
+    settlements: alpha.settlements || [],
+    updatedAt: new Date().toISOString()
+  };
+}
+
+function normalizeAlphaSettings(settings = {}) {
+  return {
+    roundLengthDays: Number(settings.roundLengthDays || 7),
+    lastRebalanceAt: String(settings.lastRebalanceAt || new Date().toISOString().slice(0, 10)),
+    aggressiveness: Number(settings.aggressiveness || 8),
+    minInfluence: Number(settings.minInfluence || 0.3),
+    maxInfluence: Number(settings.maxInfluence || 3),
+    smoothing: clamp(Number(settings.smoothing ?? 0.35), 0, 1),
+    maxTickerWeight: clamp(Number(settings.maxTickerWeight || 0.35), 0.05, 1)
+  };
+}
+
+function normalizeAlphaMember(member) {
+  const picks = (Array.isArray(member.picks) ? member.picks : [])
+    .map((pick) => {
+      if (typeof pick === 'string') {
+        return { symbol: normalizeTicker(pick), costBasis: null, costSource: 'legacy' };
+      }
+
+      return {
+        symbol: normalizeTicker(pick.symbol),
+        costBasis: normalizeCostBasis(pick.costBasis),
+        costSource: pick.costSource || 'member'
+      };
+    })
+    .filter((pick) => pick.symbol);
+  const uniquePicks = [];
+
+  for (const pick of picks) {
+    if (!uniquePicks.some((entry) => entry.symbol === pick.symbol)) {
+      uniquePicks.push(pick);
+    }
+  }
+
+  return {
+    name: String(member.name || '').trim(),
+    influence: isPositiveNumber(member.influence) ? Number(member.influence) : 1,
+    previousInfluence: isPositiveNumber(member.previousInfluence) ? Number(member.previousInfluence) : 1,
+    picks: uniquePicks.slice(0, 2),
+    joinedAt: member.joinedAt || null,
+    updatedAt: member.updatedAt || null
+  };
+}
+
+async function getAlphaMarketData(symbols) {
+  const entries = await Promise.all(symbols.map(async (symbol) => [symbol, await getSymbolMarketWindow(symbol)]));
+  return Object.fromEntries(entries);
+}
+
+async function getSymbolMarketWindow(symbol) {
+  const quote = await getQuote(symbol);
+
+  if (!finnhubApiKey || quote.isDemo) {
+    return makeDemoMarketWindow(symbol, quote);
+  }
+
+  try {
+    const toDate = new Date();
+    const fromDate = new Date(toDate);
+    fromDate.setDate(fromDate.getDate() - 18);
+    const candles = await fetchCandles(symbol, Math.floor(fromDate.getTime() / 1000), Math.floor(toDate.getTime() / 1000));
+    const dates = Object.keys(candles).sort();
+    if (dates.length < 2) {
+      return makeDemoMarketWindow(symbol, quote);
+    }
+
+    const targetDate = new Date(toDate);
+    targetDate.setDate(targetDate.getDate() - 7);
+    const targetKey = targetDate.toISOString().slice(0, 10);
+    const baseDate = dates.filter((date) => date <= targetKey).at(-1) || dates[0];
+    const closes = dates.map((date) => Number(candles[date])).filter((value) => isPositiveNumber(value));
+    const price = quote.price;
+    const sevenDayBase = Number(candles[baseDate]);
+    const low = Math.min(...closes, price);
+    const high = Math.max(...closes, price);
+
+    return {
+      symbol,
+      price,
+      sevenDayBase,
+      sevenDayReturn: percentage(price - sevenDayBase, sevenDayBase) / 100,
+      volatility: standardDeviation(closes.slice(1).map((close, index) => (close - closes[index]) / closes[index])),
+      rangePosition: high > low ? (price - low) / (high - low) : 0.5,
+      provider: 'finnhub'
+    };
+  } catch (error) {
+    return makeDemoMarketWindow(symbol, quote);
+  }
+}
+
+function makeDemoMarketWindow(symbol, quote) {
+  const sevenDayReturn = demoSevenDayReturn(symbol);
+  const sevenDayBase = quote.price / (1 + sevenDayReturn);
+  const volatility = demoVolatility(symbol);
+
+  return {
+    symbol,
+    price: quote.price,
+    sevenDayBase,
+    sevenDayReturn,
+    volatility,
+    rangePosition: clamp(0.54 + sevenDayReturn * 2.4, 0.05, 0.95),
+    provider: quote.provider || 'demo'
+  };
+}
+
+function enrichPick(pick, market) {
+  const costBasis = isPositiveNumber(pick.costBasis) ? Number(pick.costBasis) : market.price;
+  const sevenDayReturn = clamp(market.sevenDayReturn, -0.5, 0.5);
+  const costReturn = clamp((market.price - costBasis) / costBasis, -0.5, 0.5);
+  const volatility = clamp(market.volatility || 0, 0, 0.4);
+  const chasePenalty = Math.max(0, (market.rangePosition || 0.5) - 0.72) * 0.12;
+  const compositeScore = (sevenDayReturn * 0.42) + (costReturn * 0.42) - (volatility * 0.16) - chasePenalty;
+  const qualityMultiplier = clamp(1 + compositeScore * 3, 0.65, 1.45);
+
+  return {
+    ...pick,
+    costBasis,
+    price: market.price,
+    sevenDayBase: market.sevenDayBase,
+    sevenDayReturn,
+    costReturn,
+    volatility,
+    rangePosition: market.rangePosition,
+    chasePenalty,
+    compositeScore,
+    qualityMultiplier
+  };
+}
+
+function normalizeWeightMap(weightMap, fund) {
+  const total = Object.values(weightMap).reduce((sum, value) => sum + Number(value || 0), 0);
+  if (total <= 0) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(weightMap)
+      .map(([symbol, value]) => [symbol, Number(value || 0) / total])
+      .filter(([, value]) => value > 0)
+      .map(([symbol, value]) => [describeSymbol(symbol, fund).symbol, value])
+  );
+}
+
+function smoothWeights(currentWeights, consensusWeights, smoothing) {
+  const symbols = [...new Set([...Object.keys(currentWeights), ...Object.keys(consensusWeights)])];
+  const raw = Object.fromEntries(
+    symbols.map((symbol) => [
+      symbol,
+      Number(currentWeights[symbol] || 0) * (1 - smoothing) + Number(consensusWeights[symbol] || 0) * smoothing
+    ])
+  );
+
+  return normalizeWeightMap(raw, { holdings: [] });
+}
+
+function capWeights(weightMap, maxWeight) {
+  let weights = { ...weightMap };
+
+  for (let pass = 0; pass < 8; pass += 1) {
+    const capped = Object.entries(weights).filter(([, weight]) => weight > maxWeight);
+    if (!capped.length) {
+      break;
+    }
+
+    const excess = capped.reduce((sum, [, weight]) => sum + weight - maxWeight, 0);
+    const receivers = Object.entries(weights).filter(([, weight]) => weight < maxWeight);
+    const receiverTotal = receivers.reduce((sum, [, weight]) => sum + weight, 0);
+
+    for (const [symbol] of capped) {
+      weights[symbol] = maxWeight;
+    }
+
+    if (receiverTotal <= 0) {
+      break;
+    }
+
+    for (const [symbol, weight] of receivers) {
+      weights[symbol] = weight + excess * (weight / receiverTotal);
+    }
+  }
+
+  return normalizeWeightMap(weights, { holdings: [] });
+}
+
+function describeSymbol(symbol, fund) {
+  const holding = fund.holdings.find((entry) => entry.symbol === symbol);
+  return {
+    symbol,
+    name: holding?.name || symbol,
+    theme: holding?.theme || 'Community Pick'
+  };
+}
+
+function demoSevenDayReturn(symbol) {
+  const returns = {
+    NVDA: 0.075,
+    SNDK: 0.112,
+    MU: 0.064,
+    ORCL: 0.018,
+    INTC: -0.021,
+    GEV: 0.033,
+    LITE: 0.058,
+    QQQ: 0.016
+  };
+
+  if (symbol in returns) {
+    return returns[symbol];
+  }
+
+  return ((hashSymbol(symbol) % 1300) - 400) / 10000;
+}
+
+function demoVolatility(symbol) {
+  return 0.018 + (hashSymbol(symbol) % 90) / 5000;
+}
+
+function hashSymbol(symbol) {
+  return [...symbol].reduce((hash, char) => hash + char.charCodeAt(0) * 17, 0);
 }
 
 async function getQuote(symbol) {
@@ -517,6 +1041,58 @@ function basePrice(holding, quote) {
   }
 
   return 1;
+}
+
+function average(values) {
+  const cleanValues = values.filter((value) => Number.isFinite(Number(value)));
+  if (!cleanValues.length) {
+    return 0;
+  }
+
+  return cleanValues.reduce((sum, value) => sum + Number(value), 0) / cleanValues.length;
+}
+
+function median(values) {
+  const cleanValues = values
+    .filter((value) => Number.isFinite(Number(value)))
+    .map(Number)
+    .sort((a, b) => a - b);
+
+  if (!cleanValues.length) {
+    return 0;
+  }
+
+  const middle = Math.floor(cleanValues.length / 2);
+  return cleanValues.length % 2
+    ? cleanValues[middle]
+    : (cleanValues[middle - 1] + cleanValues[middle]) / 2;
+}
+
+function standardDeviation(values) {
+  const cleanValues = values.filter((value) => Number.isFinite(Number(value))).map(Number);
+  if (cleanValues.length < 2) {
+    return 0;
+  }
+
+  const mean = average(cleanValues);
+  const variance = average(cleanValues.map((value) => (value - mean) ** 2));
+  return Math.sqrt(variance);
+}
+
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, Number(value)));
+}
+
+function addDays(dateText, days) {
+  const date = new Date(`${dateText}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + Number(days || 0));
+  return date.toISOString().slice(0, 10);
+}
+
+function daysBetween(startText, endText) {
+  const start = new Date(`${startText}T00:00:00Z`);
+  const end = new Date(`${endText}T00:00:00Z`);
+  return Math.ceil((end - start) / 86400000);
 }
 
 function percentage(numerator, denominator) {

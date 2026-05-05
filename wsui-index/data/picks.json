@@ -1,0 +1,13 @@
+{
+  "settings": {
+    "roundLengthDays": 7,
+    "lastRebalanceAt": "2026-05-05",
+    "aggressiveness": 8,
+    "minInfluence": 0.3,
+    "maxInfluence": 3,
+    "smoothing": 0.35,
+    "maxTickerWeight": 0.35
+  },
+  "members": [],
+  "settlements": []
+}
